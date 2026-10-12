@@ -166,6 +166,17 @@ h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.7rem
 .shut{display:grid;place-items:center;width:24px;height:24px;font-size:20px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
 .bldg-canvas{position:absolute;left:0;top:0;pointer-events:none;transition:opacity .25s}
 
+/* Trip lane polish */
+.steps{margin:6px 0 10px;padding-left:22px;font-size:.92rem;line-height:1.6}
+.flow{animation:march 1.1s linear infinite}
+@keyframes march{to{stroke-dashoffset:-30}}
+@media (prefers-reduced-motion:reduce){.flow{animation:none !important}}
+button.traffic{background:none;border:0;padding:5px 8px;border-radius:10px;cursor:pointer;font-family:inherit}
+button.traffic:hover{background:var(--card)}
+button.traffic[aria-pressed="false"]{opacity:.7}
+.keyrow input{flex:1;min-width:0;border:1.5px solid var(--mist);background:var(--card);border-radius:10px;padding:9px 12px}
+.keyrow .btn{margin-top:0}
+
 /* Map pins */
 .pin{width:18px;height:18px;border:3px solid #fff;background:var(--road);border-radius:50%;box-shadow:0 1px 5px rgba(0,0,0,.45)}
 .pin.b{background:var(--coral);border-radius:4px}
@@ -177,7 +188,7 @@ h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.7rem
 
   <section class="sheet" id="sheet" aria-label="Plan your trip">
     <div class="grab" aria-hidden="true"></div>
-    <div class="top"><h1>Byahe</h1><p class="traffic"><span class="tdot" id="tdot"></span><span id="ttext">Loading traffic…</span></p></div>
+    <div class="top"><h1>Byahe</h1><button type="button" class="traffic" id="traffic-pill" aria-pressed="true" title="Turn traffic on or off"><span class="tdot" id="tdot"></span><span id="ttext">Loading traffic…</span></button></div>
 
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-t="trip" aria-selected="true">Trip</button>
@@ -209,7 +220,9 @@ h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.7rem
     <div class="chips" id="chips" role="group" aria-label="Popular places in Baguio"></div>
 
     <p id="status" role="status">Tap a pin button to place My Location or Destination/Stop on the map, or search for a place.</p>
+    <button id="retry" class="ghostbtn" type="button" hidden>Try again</button>
     <div id="options"></div>
+    <ol class="steps" id="steps" hidden></ol>
     <button id="confirm" hidden></button>
     <button id="save-route" class="ghostbtn" type="button" hidden>Save route</button>
 
@@ -258,9 +271,12 @@ h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.7rem
       <label class="row"><span>Taxi radar range</span><select id="s-radar"><option value="150">150 m</option><option value="300" selected>300 m</option><option value="500">500 m</option></select></label>
       <label class="row"><span>Show bus routes and terminals</span><input type="checkbox" id="s-terms" checked></label>
       <label class="row"><span>3D buildings <small>(zoom in to see)</small></span><input type="checkbox" id="s-b3d" checked></label>
-      <label class="row"><span>Traffic on the map</span><input type="checkbox" id="s-roads" checked></label>
+      <label class="row"><span>Traffic</span><input type="checkbox" id="s-roads" checked></label>
       <p class="hint"><i class="lg y"></i>Mild<i class="lg r"></i>Heavy<i class="lg k"></i>Closed ⛔️ (simulated)</p>
-      <label class="row"><span>Traffic</span><select id="s-traffic"><option value="auto">Automatic (simulated)</option><option value="light">Light</option><option value="moderate">Moderate</option><option value="heavy">Heavy</option></select></label>
+      <label class="row"><span>Traffic data</span><select id="s-source"><option value="sim" selected>Simulated</option><option value="live">Live (TomTom key)</option></select></label>
+      <div class="row keyrow" id="keyrow" hidden><input id="s-key" type="password" autocomplete="off" placeholder="Paste your free TomTom key" aria-label="TomTom API key"><button type="button" class="btn" id="s-keysave">Save</button></div>
+      <p class="hint" id="key-msg">Live traffic needs a free key from developer.tomtom.com. It stays in this browser only. Coverage in smaller cities can be thin.</p>
+      <label class="row"><span>Simulated level</span><select id="s-traffic"><option value="auto">Automatic (simulated)</option><option value="light">Light</option><option value="moderate">Moderate</option><option value="heavy">Heavy</option></select></label>
       <label class="row"><span>Walking pace</span><select id="s-walk"><option value="15">Normal (hilly)</option><option value="12">Fast</option><option value="20">Slow</option></select></label>
       <label class="row"><span>Vehicle speed on the map</span><select id="s-sim"><option value="1">Real time</option><option value="4" selected>4x, easier to watch</option><option value="10">10x</option></select></label>
     </div>
@@ -311,7 +327,7 @@ function clearRoute(){
   if(routeLayer){ map.removeLayer(routeLayer); routeLayer = null; }
   tripTraffic.clearLayers();
   route = null; selected = null; walk = null; hotBoost = 0;
-  $('#options').innerHTML = ''; $('#confirm').hidden = true; $('#save-route').hidden = true;
+  $('#options').innerHTML = ''; $('#confirm').hidden = true; $('#save-route').hidden = true; $('#retry').hidden = true; $('#steps').hidden = true;
 }
 
 /* Search places in the Philippines (Nominatim: free, keep to one search per tap) */
@@ -348,7 +364,10 @@ $('#loc').onclick = () => {
 /* Tap the map: first tap sets pickup, later taps set drop-off */
 map.on('click', e => mapTap(e));
 
-const settings={jeeps:true,taxis:true,terms:true,traffic:'auto',walk:15,sim:4,radar:300,b3d:true,roads:true};
+const settings={jeeps:true,taxis:true,terms:true,traffic:'auto',walk:15,sim:4,radar:300,b3d:true,roads:true,source:'sim'};
+let ttKey='', liveFactor=null, liveInfo='', routeBusy=false;
+// Routing servers, tried in order. The second one is a backup in case the first is busy.
+const OSRM={driving:['https://router.project-osrm.org/route/v1/driving/','https://routing.openstreetmap.de/routed-car/route/v1/driving/'],foot:['https://routing.openstreetmap.de/routed-foot/route/v1/foot/']};
 /* ---- Simulated live traffic for Baguio (no real traffic feed, this is a simulation) ---- */
 const LEVELS=[{max:.35,n:'Light',c:'#2E9E5B'},{max:.65,n:'Moderate',c:'#F2C200'},{max:1.01,n:'Heavy',c:'#D43F2F'}];
 const TF={taxi:1,car:1,moto:.6,trike:.8,jeep:1.1,bus:1.2};   // how much traffic slows each ride
@@ -373,49 +392,128 @@ function updateTraffic(){
   drift=clamp(drift+(Math.random()-.5)*.14,-.2,.2);
   traffic=clamp(baseTraffic()+drift+hotBoost,.05,1);
   if(settings.traffic!=='auto') traffic={light:.2,moderate:.5,heavy:.85}[settings.traffic];
+  if(!settings.roads) traffic=0;
+  else if(liveOn() && liveFactor) traffic=clamp((liveFactor-1)/.9,0,1);
   const l=level();
   $('#tdot').style.background=l.c;
-  $('#ttext').textContent=`${l.n} traffic (simulated), ${clock(new Date())}`;
+  $('#ttext').textContent = !settings.roads ? 'Traffic off' : liveOn() ? (liveInfo || 'Live traffic on') : `${l.n} traffic (simulated), ${clock(new Date())}`;
+  $('#tdot').style.background = !settings.roads ? '#8895A0' : liveOn() ? '#2B7FFF' : l.c;
 }
 function hotspots(coords){
   return HOT.filter(h=>coords.some((c,i)=>i%5===0 && map.distance([c[1],c[0]],h)<250)).length;
 }
 
 /* ---- Routes: road route (OSRM) and walking route in parallel ---- */
-async function getRoute(){
-  say('Finding the best route…');
-  const a=pts.pickup, b=pts.drop, q=`${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`;
-  const [d,w]=await Promise.allSettled([
-    fetch('https://router.project-osrm.org/route/v1/driving/'+q).then(r=>r.json()),
-    fetch('https://routing.openstreetmap.de/routed-foot/route/v1/foot/'+q).then(r=>r.json())]);
-  const rt=d.value && d.value.code==='Ok' && d.value.routes[0];
-  if(!rt) return say(d.status==='rejected' ? 'Could not reach the routing service. Check your connection and try again.' : 'No road route found between those two places.');
-  route={km:rt.distance/1000, min:rt.duration/60, geo:rt.geometry};
-  const wt=w.value && w.value.code==='Ok' && w.value.routes[0];
-  walk=wt ? {km:wt.distance/1000, geo:wt.geometry} : {km:route.km, geo:rt.geometry};
-  hotBoost=Math.min(.2,hotspots(rt.geometry.coordinates)*.07);
-  updateTraffic();
-  setPanel(true);
-  draw('drive',true);
-  say(`${fmtDist(route.km)} by road. ${level().n} traffic right now. Choose a ride or walk.`);
-  $('#save-route').hidden=false;
-  renderOptions();
+async function osrm(profile,coords,params='overview=full&geometries=geojson'){   // tries each server, twice
+  for(const base of OSRM[profile]) for(let n=0;n<2;n++){
+    try{ const r=await fetch(base+coords+'?'+params); if(r.ok){ const d=await r.json(); if(d.code==='Ok'||d.code==='NoRoute') return d; } }catch(e){}
+    await new Promise(z=>setTimeout(z,400));
+  }
+  return null;
 }
+const trafficWord=()=>!settings.roads ? 'Traffic is switched off.' : liveOn() ? (liveInfo || 'Checking live traffic…') : `${level().n} traffic right now (simulated).`;
 
-function draw(kind,fit){
+async function getRoute(){
+  routeBusy=true; $('#retry').hidden=true; say('Finding the best route…');
+  const a=pts.pickup, b=pts.drop, q=`${a.lng},${a.lat};${b.lng},${b.lat}`;
+  try{
+    const [d,w]=await Promise.all([osrm('driving',q),osrm('foot',q)]);
+    const rt=d && d.code==='Ok' && d.routes[0];
+    if(!rt){
+      say(d ? 'No road route between those two places. They may be on different islands, or a pin is off the road network.' : 'The routing servers did not answer. Check your internet connection.');
+      $('#retry').hidden=false; return;
+    }
+    route={km:rt.distance/1000, min:rt.duration/60, geo:rt.geometry};
+    const wt=w && w.code==='Ok' && w.routes[0];
+    walk=wt ? {km:wt.distance/1000, geo:wt.geometry} : {km:route.km, geo:rt.geometry};
+    hotBoost=Math.min(.2,hotspots(rt.geometry.coordinates)*.07);
+    liveFactor=null; liveInfo='';
+    updateTraffic(); setPanel(true);
+    await draw('drive',true);
+    say(`${fmtDist(route.km)} by road. ${trafficWord()} Choose a ride or walk.`);
+    $('#save-route').hidden=false;
+    renderOptions();
+    fetchLive();
+  } finally { routeBusy=false; }
+}
+$('#retry').onclick=()=>{ if(pts.pickup && pts.drop) getRoute(); };
+
+/* ---- The route lane: outlined line, walking legs, transit lane between stops, direction flow ---- */
+let drawToken=0; const legsCache={};
+async function footLeg(a,b){
+  const k=`${a.lat.toFixed(5)},${a.lng.toFixed(5)}>${b.lat.toFixed(5)},${b.lng.toFixed(5)}`;
+  if(legsCache[k]) return legsCache[k];
+  const d=await osrm('foot',`${a.lng},${a.lat};${b.lng},${b.lat}`), rt=d && d.code==='Ok' && d.routes[0];
+  if(!rt) return {pts:[[a.lat,a.lng],[b.lat,b.lng]],km:map.distance(a,b)/1000};   // straight line if the walking router is busy
+  return legsCache[k]={pts:rt.geometry.coordinates.map(c=>[c[1],c[0]]),km:rt.distance/1000};
+}
+function slicePath(r,d1,d2){   // the part of a route between two distances, in riding order
+  const rev=d1>d2; if(rev){ const t=d1; d1=d2; d2=t; }
+  const out=[pointAt(r,d1)]; r.cum.forEach((c,i)=>{ if(c>d1 && c<d2) out.push(r.path[i]); }); out.push(pointAt(r,d2));
+  return rev?out.reverse():out;
+}
+function matchBus(){   // intercity bus whose terminals are both within 3 km of the pickup and destination
+  let best=null;
+  BUSES.forEach(r=>{
+    const near=p=>r.stops.map(s=>({s,w:map.distance([s[1],s[2]],[p.lat,p.lng])})).sort((x,y)=>x.w-y.w)[0];
+    const a=near(pts.pickup), b=near(pts.drop);
+    if(a.w<3000 && b.w<3000 && a.s!==b.s && (!best || a.w+b.w<best.a.w+best.b.w)) best={r,a,b};
+  });
+  return best;
+}
+async function transitPlan(kind){
+  const t=kind==='jeep' ? matchRoute() : matchBus();
+  if(!t) return null;
+  const A={lat:t.a.s[1],lng:t.a.s[2]}, B={lat:t.b.s[1],lng:t.b.s[2]};
+  const [w1,w2]=await Promise.all([footLeg(pts.pickup,A),footLeg(B,pts.drop)]);
+  return {t,w1,w2,ride:t.r.path ? slicePath(t.r,t.a.s.d,t.b.s.d) : [[A.lat,A.lng],[B.lat,B.lng]]};
+}
+async function draw(kind,fit){
+  const token=++drawToken, dark=document.documentElement.dataset.theme==='dark';
+  const g=L.featureGroup(), casing=dark?'#0B1A21':'#ffffff', brand=dark?'#5CB8D6':'#0F3D4C';
+  const lane=(ln,color,w=6,dash=null)=>{
+    L.polyline(ln,{color:casing,weight:w+5,opacity:.9,lineCap:'round',lineJoin:'round',interactive:false}).addTo(g);
+    return L.polyline(ln,{color,weight:w,opacity:1,lineCap:'round',lineJoin:'round',dashArray:dash,interactive:false}).addTo(g);
+  };
+  let plan=null;
+  if(kind==='walk') lane(walk.geo.coordinates.map(c=>[c[1],c[0]]),dark?'#E8F0F2':'#13222B',5,'2 9');
+  else if(kind==='jeep' || kind==='bus'){
+    plan=await transitPlan(kind);
+    if(token!==drawToken) return;
+    if(plan){
+      lane(plan.w1.pts,'#5B6B72',4,'2 9'); lane(plan.w2.pts,'#5B6B72',4,'2 9');
+      lane(plan.ride,plan.t.r.color,7);
+      L.polyline(plan.ride,{color:'#fff',weight:2,opacity:.9,dashArray:'1 14',className:'flow',interactive:false}).addTo(g);   // shows the direction of travel
+    }
+  }
+  if(!plan && kind!=='walk') lane(route.geo.coordinates.map(c=>[c[1],c[0]]),brand,6);   // road route
   if(routeLayer) map.removeLayer(routeLayer);
-  const isWalk=kind==='walk';
-  routeLayer=L.geoJSON(isWalk?walk.geo:route.geo,{style:{color:isWalk?(document.documentElement.dataset.theme==='dark'?'#E8F0F2':'#13222B'):(document.documentElement.dataset.theme==='dark'?'#5CB8D6':'#0F3D4C'),weight:6,opacity:.9,dashArray:isWalk?'2 10':null,lineCap:'round'}}).addTo(map);
-  isWalk ? tripTraffic.clearLayers() : paintTraffic();   // yellow and red stretches on the trip route
-  if(!fit) return;
-  const mobile=matchMedia('(max-width:767px)').matches;
-  map.fitBounds(routeLayer.getBounds(),pad());
+  routeLayer=g.addTo(map);
+  if(kind==='walk' || plan) tripTraffic.clearLayers(); else paintTraffic();
+  showSteps(kind,plan);
+  if(fit) map.fitBounds(g.getBounds(),pad());
+}
+function showSteps(kind,plan){   // step-by-step list under the options
+  const ol=$('#steps'); ol.innerHTML=''; ol.hidden=true;
+  if(!selected) return;
+  const add=t=>{ const li=document.createElement('li'); li.textContent=t; ol.append(li); };
+  if(kind==='walk') add(`Walk ${fmtDist(walk.km)}, about ${Math.round(walk.km*settings.walk)} min. Hilly streets can take longer.`);
+  else if(plan){
+    const {t,w1,w2}=plan, n=Math.abs(t.r.stops.indexOf(t.a.s)-t.r.stops.indexOf(t.b.s));
+    add(`Walk ${fmtDist(w1.km)} to ${t.a.s[0]}.`);
+    add(kind==='jeep' ? `Board ${t.r.name} (next jeepney ${nextEta(t.r,t.a.s)}).` : `Board the ${t.r.name} bus.`);
+    add(`Ride ${n} stop${n>1?'s':''}, then get off at ${t.b.s[0]}.`);
+    add(`Walk ${fmtDist(w2.km)} to your destination.`);
+  }
+  else if(kind==='jeep' || kind==='bus') add(`No ${kind==='jeep'?'jeepney':'bus'} route is near both places, so the road route is shown instead.`);
+  else add(`Ride ${fmtDist(route.km)} by road. ${trafficWord()}`);
+  ol.hidden=!ol.children.length;
 }
 
 /* ---- Options: fare and ETA change live with traffic ---- */
 function quote(key,m){
   const walking=key==='walk';
-  const mins=walking ? walk.km*settings.walk : route.min*(1+traffic*.9*TF[key])*m.slow;
+  const mins=walking ? walk.km*settings.walk : route.min*trafficMult(key)*m.slow;
   const fare=walking ? 0 : Math.round(m.base+Math.max(0,route.km-(m.freeKm||0))*m.perKm+(m.perMin||0)*mins);
   return {fare, eta:Math.round(mins+(key==='taxi'?taxiWait():(m.wait||0))), km:walking?walk.km:route.km};
 }
@@ -427,11 +525,12 @@ function renderOptions(){
     if(m.maxKm && route.km>m.maxKm) return;
     const q=quote(key,m), walking=key==='walk', on=!!selected && selected.key===key, b=document.createElement('button');
     const arrive=clock(new Date(Date.now()+q.eta*60000));
-    const t=key==='jeep' ? matchRoute() : null; let note=(m.note||'').toLowerCase();
+    const t=key==='jeep' ? matchRoute() : key==='bus' ? matchBus() : null; let note=(m.note||'').toLowerCase();
     if(key==='jeep') note=t ? `take ${t.r.name} from ${t.a.s[0]} to ${t.b.s[0]}, walk ${fmtDist((t.a.w+t.b.w)/1000)} in total, next jeepney ${nextEta(t.r,t.a.s)}` : 'no route nearby, estimate from road distance';
+    if(key==='bus') note=t ? `take ${t.r.name} from ${t.a.s[0]} to ${t.b.s[0]}` : 'no terminal near both places, estimate from road distance';
     b.className='opt'; b.setAttribute('aria-pressed',String(on)); b.style.setProperty('--c',t?t.r.color:m.color);
     b.innerHTML=`<span class="ico" aria-hidden="true">${m.ico}</span><span class="name">${m.label}</span><span class="fare">${walking?fmtDist(q.km):'₱'+q.fare}</span><span class="sub">About ${q.eta} min, arrive ${arrive}${note?', '+note:''}</span>`;
-    b.onclick=()=>{ selected={key}; renderOptions(); draw(walking?'walk':'drive',true); $('.opt[aria-pressed="true"]').focus(); };
+    b.onclick=()=>{ selected={key}; renderOptions(); draw(key,true); $('.opt[aria-pressed="true"]').focus(); };
     box.append(b);
     if(on) chosen={key,m,q};
   });
@@ -454,7 +553,7 @@ SPOTS.forEach(([n,la,ln])=>{
 function tick(){
   updateTraffic();
   if(!route) return;
-  draw(selected && selected.key==='walk' ? 'walk' : 'drive', false);
+  draw(selected ? selected.key : 'drive', false);
   renderOptions();
 }
 updateTraffic();
@@ -474,8 +573,8 @@ JEEPS.forEach(async r=>{
   const g=L.layerGroup().addTo(map); jeepGroups[r.id]=g;
   let latlngs=r.stops.map(s=>[s[1],s[2]]);   // fallback: straight lines between stops
   try{   // follow the real roads between the stops
-    const d=await (await fetch('https://router.project-osrm.org/route/v1/driving/'+r.stops.map(s=>s[2]+','+s[1]).join(';')+'?overview=full&geometries=geojson')).json();
-    if(d.code==='Ok') latlngs=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+    const d=await osrm('driving',r.stops.map(s=>s[2]+','+s[1]).join(';'));
+    if(d && d.code==='Ok') latlngs=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
   }catch(e){}
   L.polyline(latlngs,{color:r.color,weight:5,opacity:.85,lineCap:'round'}).addTo(g).bringToBack();
   buildPath(r,latlngs); spawnJeeps(r);
@@ -583,11 +682,12 @@ async function spawnTaxis(c){
     const a=Math.random()*6.283, b=a+3.1416+(Math.random()-.5)*1.2;
     const from=offset(taxiC,R*Math.cos(a),R*Math.sin(a)), to=offset(taxiC,R*Math.cos(b),R*Math.sin(b));
     await new Promise(z=>setTimeout(z,300));   // be gentle with the free routing server
+    while(routeBusy) await new Promise(z=>setTimeout(z,300));   // the trip route goes first
     if(token!==radarToken) return;
     try{
-      const d=await (await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`)).json();
+      const d=await osrm('driving',`${from.lng},${from.lat};${to.lng},${to.lat}`);
       if(token!==radarToken) return;
-      if(d.code!=='Ok') continue;
+      if(!d || d.code!=='Ok') continue;
       const t={stops:[],kind:i<5?'taxi':'jeep',d:0,wait:Math.random()*5,seen:false,vis:false};
       buildPath(t,d.routes[0].geometry.coordinates.map(q=>[q[1],q[0]]));
       t.mk=L.marker(t.path[0],{icon:(t.kind==='taxi' ? vehIcon('T','#FFC20E','#13222B') : vehIcon('J','#3A7CA5')),keyboard:false,interactive:false,opacity:0}).addTo(taxiGroup);
@@ -649,10 +749,11 @@ BUSES.forEach(async (r,i)=>{
   let latlngs=r.stops.map(s=>[s[1],s[2]]);
   await new Promise(z=>setTimeout(z,600+i*500));   // stagger requests to the free routing server
   try{
-    const d=await (await fetch('https://router.project-osrm.org/route/v1/driving/'+r.stops.map(s=>s[2]+','+s[1]).join(';')+'?overview=simplified&geometries=geojson')).json();
-    if(d.code==='Ok'){ latlngs=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]); r.km=d.routes[0].distance/1000; r.min=d.routes[0].duration/60; }
+    const d=await osrm('driving',r.stops.map(s=>s[2]+','+s[1]).join(';'),'overview=simplified&geometries=geojson');
+    if(d && d.code==='Ok'){ latlngs=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]); r.km=d.routes[0].distance/1000; r.min=d.routes[0].duration/60; }
   }catch(e){}
   r.line=L.polyline(latlngs,{color:r.color,weight:4,opacity:.75,dashArray:'10 8'}).addTo(busGroup).bringToBack();
+  buildPath(r,latlngs);
 });
 function focusBus(id){
   BUSES.forEach(r=>r.btn.setAttribute('aria-pressed',String(r.id===id)));
@@ -671,7 +772,7 @@ bind('#s-jeeps',el=>{settings.jeeps=el.checked; toggle(jeepGroup,el.checked);});
 bind('#s-taxis',el=>{settings.taxis=el.checked; toggle(taxiGroup,el.checked);});
 bind('#s-radar',el=>{settings.radar=+el.value; if(taxiC) spawnTaxis(taxiC);});
 bind('#s-b3d',el=>{settings.b3d=el.checked; if(el.checked) loadArea(); drawBuildings();});
-bind('#s-roads',el=>{settings.roads=el.checked; toggle(trafficGroup,el.checked); if(el.checked) loadArea();});
+bind('#s-roads',el=>{settings.roads=el.checked; syncTraffic();});
 bind('#s-terms',el=>{settings.terms=el.checked; toggle(busGroup,el.checked);});
 bind('#s-traffic',el=>{settings.traffic=el.value; tick(); drawTraffic();});
 bind('#s-walk',el=>{settings.walk=+el.value; if(route) renderOptions();});
@@ -704,7 +805,7 @@ function applyTheme(animate){
   const dark=themeMode==='dark' || (themeMode==='system' && darkQuery.matches);
   document.documentElement.dataset.theme=dark?'dark':'light';
   document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.m===themeMode)));
-  if(route) draw(selected && selected.key==='walk' ? 'walk' : 'drive', false);   // recolor the trip line
+  if(route) draw(selected ? selected.key : 'drive', false);   // recolor the trip line
   try{ drawBuildings(); }catch(e){}
 }
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
@@ -818,7 +919,7 @@ function loadArea(){
     const z=map.getZoom(), v=map.getBounds(), w=v.pad(.25), box={south:w.getSouth(),north:w.getNorth(),west:w.getWest(),east:w.getEast()};
     const bb=`${box.south},${box.west},${box.north},${box.east}`;
     try{
-      if(settings.roads && z>=14 && !inBox(roadBox,v)){
+      if(settings.roads && !liveOn() && z>=14 && !inBox(roadBox,v)){
         roadData=await overpass(`[out:json][timeout:25];way["highway"~"^(trunk|primary|secondary|tertiary)$"](${bb});out geom 800;`); roadBox=box; drawTraffic();
       }
       if(settings.b3d && z>=16 && !inBox(bldBox,v)){
@@ -827,7 +928,7 @@ function loadArea(){
     }catch(e){}   // the free server can be busy; it retries on the next map move
   },700);
 }
-map.on('moveend',loadArea);
+map.on('moveend',()=>{ loadArea(); loadIncidents(); });
 
 /* ---- Simulated traffic on the map: yellow = mild, red = heavy, black + ⛔️ = closed ---- */
 const hash=str=>{ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); } return ((h>>>0)%1000)/1000; };
@@ -847,7 +948,7 @@ function chunks(line,len=180){   // split a line into pieces of about len meters
 }
 function drawTraffic(){
   trafficGroup.clearLayers();
-  if(!roadData) return;
+  if(!roadData || !settings.roads || liveOn()) return;
   let marks=0;
   roadData.forEach(w=>{
     if(!w.geometry) return;
@@ -861,6 +962,7 @@ function drawTraffic(){
 }
 function paintTraffic(){   // color the trip route by stretch
   tripTraffic.clearLayers();
+  if(!settings.roads || liveOn()) return;
   chunks(route.geo.coordinates.map(c=>L.latLng(c[1],c[0])),150).forEach(c=>{
     const lv=segLevel(c[Math.floor(c.length/2)]);
     if(lv) L.polyline(c,{color:lv===2?'#D43F2F':'#F2C200',weight:6,opacity:.95,lineCap:'round',interactive:false}).addTo(tripTraffic);
@@ -910,6 +1012,87 @@ map.on('zoomstart',()=>{ bCanvas.style.opacity=0; });
 map.on('zoomend',()=>{ bCanvas.style.opacity=1; });
 
 loadArea(); renderLib(); arm(null);
+
+/* ---- Traffic: on/off, simulated or live. Live mode uses your own free TomTom key ---- */
+const TT='https://api.tomtom.com';
+const liveGroup=L.layerGroup().addTo(map);
+let incGroup=null, incTimer=null;
+function liveOn(){ return settings.roads && settings.source==='live' && !!ttKey; }
+function trafficMult(key){   // how much traffic slows this ride: live ratio, simulated level, or none when off
+  if(!settings.roads) return 1;
+  return (liveOn() && liveFactor) ? 1+(liveFactor-1)*TF[key] : 1+traffic*.9*TF[key];
+}
+async function fetchLive(){   // real travel time with traffic for the current trip
+  if(!liveOn() || !route || !pts.pickup || !pts.drop) return;
+  try{
+    const a=pts.pickup, b=pts.drop;
+    const r=await fetch(`${TT}/routing/1/calculateRoute/${a.lat},${a.lng}:${b.lat},${b.lng}/json?key=${ttKey}&traffic=true&travelMode=car`);
+    if(!r.ok) throw new Error(r.status);
+    const sm=(await r.json()).routes[0].summary, delay=Math.round((sm.trafficDelayInSeconds||0)/60);
+    liveFactor=Math.max(.8,sm.travelTimeInSeconds/(route.min*60));   // compared with the free-flow road time
+    liveInfo=delay>0 ? `Live traffic adds about ${delay} min.` : 'Live traffic: no delay on this route.';
+  }catch(e){ liveFactor=null; liveInfo='Live traffic unavailable. Check your key in Settings.'; }
+  updateTraffic(); renderOptions(); say(`${fmtDist(route.km)} by road. ${trafficWord()} Choose a ride or walk.`);
+}
+function loadIncidents(){   // closures, accidents and road works from the live feed
+  clearTimeout(incTimer);
+  incTimer=setTimeout(async()=>{
+    if(!liveOn() || !incGroup || map.getZoom()<11) return;
+    const bb=map.getBounds(), f=encodeURIComponent('{incidents{type,geometry{type,coordinates},properties{iconCategory,magnitudeOfDelay,events{description}}}}');
+    try{
+      const r=await fetch(`${TT}/traffic/services/5/incidentDetails?key=${ttKey}&bbox=${bb.getWest()},${bb.getSouth()},${bb.getEast()},${bb.getNorth()}&fields=${f}&language=en-GB&timeValidityFilter=present`);
+      if(!r.ok) throw new Error(r.status);
+      incGroup.clearLayers();
+      ((await r.json()).incidents||[]).forEach(inc=>{
+        const p=inc.properties||{}, g=inc.geometry||{}, raw=g.type==='Point' ? [g.coordinates] : (g.coordinates||[]);
+        if(!raw.length) return;
+        const ll=raw.map(c=>[c[1],c[0]]), shut=p.iconCategory===8 || p.magnitudeOfDelay===4, icon={8:'⛔️',1:'⚠️',9:'🚧'}[p.iconCategory];
+        if(shut && ll.length>1) L.polyline(ll,{pane:'traffic',color:'#000',weight:9,opacity:.9,interactive:false}).addTo(incGroup);
+        if(icon){
+          const tip=document.createElement('div'); tip.textContent=(p.events&&p.events[0]&&p.events[0].description)||(shut?'Road closed':'Traffic incident');
+          L.marker(ll[Math.floor(ll.length/2)],{icon:L.divIcon({className:'',html:`<div class="shut">${icon}</div>`,iconSize:[24,24],iconAnchor:[12,12]}),keyboard:false}).bindPopup(tip).addTo(incGroup);
+        }
+      });
+    }catch(e){ $('#key-msg').textContent='Live incidents did not load. Check the key, or this area may have no live data.'; }
+  },800);
+}
+function syncTraffic(){   // apply the traffic switch, data source and key to the map
+  const live=liveOn(), sim=settings.roads && !live;
+  toggle(trafficGroup,sim);
+  $('#traffic-pill').setAttribute('aria-pressed',String(settings.roads));
+  liveGroup.clearLayers(); incGroup=null;
+  if(live){
+    const tiles=L.tileLayer(`${TT}/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=${ttKey}`,{pane:'traffic',opacity:.85,maxZoom:18});
+    let warned=false;
+    tiles.on('tileerror',()=>{ if(!warned){ warned=true; $('#key-msg').textContent='Live traffic tiles did not load. Check the key, or this area may have no live data.'; } });
+    tiles.addTo(liveGroup); incGroup=L.layerGroup().addTo(liveGroup); loadIncidents();
+  }
+  if(!sim) tripTraffic.clearLayers();
+  if(sim){ loadArea(); drawTraffic(); }
+  liveFactor=null; liveInfo='';
+  updateTraffic(); tick(); fetchLive();
+  try{ localStorage.setItem('byahe-prefs',JSON.stringify({roads:settings.roads,source:settings.source})); }catch(e){}
+}
+$('#traffic-pill').onclick=()=>$('#s-roads').click();
+bind('#s-source',el=>{
+  settings.source=el.value; $('#keyrow').hidden=el.value!=='live';
+  $('#key-msg').textContent = el.value==='live' && !ttKey ? 'Paste a TomTom key to turn on live traffic. Until then the simulated traffic stays on.' : '';
+  syncTraffic();
+});
+$('#s-keysave').onclick=()=>{
+  ttKey=$('#s-key').value.trim();
+  try{ localStorage.setItem('byahe-tomtom',ttKey); }catch(e){}
+  $('#key-msg').textContent = ttKey ? 'Key saved in this browser.' : 'Key cleared.';
+  syncTraffic();
+};
+try{
+  const pr=JSON.parse(localStorage.getItem('byahe-prefs')||'{}');
+  if(typeof pr.roads==='boolean') settings.roads=pr.roads;
+  if(pr.source) settings.source=pr.source;
+  ttKey=localStorage.getItem('byahe-tomtom')||'';
+}catch(e){}
+$('#s-roads').checked=settings.roads; $('#s-source').value=settings.source; $('#keyrow').hidden=settings.source!=='live'; $('#s-key').value=ttKey;
+syncTraffic();
 </script>
 </body>
 </html>

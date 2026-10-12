@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Go Maps| National Transit Navigator</title>
+<title>Go Maps | National Transit Navigator</title>
 <script>try{var m=localStorage.getItem('byahe-theme')||'system';document.documentElement.dataset.theme=(m==='dark'||(m==='system'&&matchMedia('(prefers-color-scheme: dark)').matches))?'dark':'light'}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -177,6 +177,26 @@ button.traffic[aria-pressed="false"]{opacity:.7}
 .keyrow input{flex:1;min-width:0;border:1.5px solid var(--mist);background:var(--card);border-radius:10px;padding:9px 12px}
 .keyrow .btn{margin-top:0}
 
+/* Fares matrix, route choices, live location */
+.seg2{display:flex;border:1.5px solid var(--mist);border-radius:10px;overflow:hidden}
+.seg2 button{flex:1;border:0;background:var(--card);color:var(--muted);padding:8px 6px;font-weight:600;cursor:pointer}
+.seg2 button[aria-checked="true"]{background:var(--road);color:var(--on-road)}
+.rider-seg{margin:10px 0 4px}
+.tablewrap{overflow-x:auto;margin-top:12px}
+.matrix{width:100%;border-collapse:collapse;font-size:.88rem}
+.matrix th,.matrix td{padding:8px 4px;border-bottom:1px solid var(--mist);text-align:center}
+.matrix th:first-child,.matrix td:first-child{text-align:left}
+.matrix .on{background:rgba(255,194,14,.22)}
+.matrix input{width:3.4em;border:1.5px solid var(--mist);background:var(--card);color:var(--ink);border-radius:8px;padding:4px;text-align:center}
+.tag{font-style:normal;font-size:.7rem;font-weight:700;margin-left:6px;padding:1px 7px;border-radius:999px;background:var(--signal);color:#13222B;vertical-align:middle}
+.locate-btn{position:absolute;z-index:1001;right:10px;top:96px;width:42px;height:42px;padding:0;display:grid;place-items:center;border-radius:50%;cursor:pointer;color:var(--ink);background:var(--glass);border:1px solid var(--glass-line);-webkit-backdrop-filter:blur(14px) saturate(170%);backdrop-filter:blur(14px) saturate(170%);box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.locate-btn[aria-pressed="true"]{color:#2B7FFF}
+.locate-btn.paused{color:var(--muted)}
+@media (min-width:768px){.locate-btn{top:auto;bottom:124px}}
+.me{width:22px;height:22px;border-radius:50%;background:#2B7FFF;border:3px solid #fff;box-shadow:0 0 0 0 rgba(43,127,255,.5);animation:mepulse 2s infinite}
+@keyframes mepulse{70%{box-shadow:0 0 0 14px rgba(43,127,255,0)}100%{box-shadow:0 0 0 0 rgba(43,127,255,0)}}
+@media (prefers-reduced-motion:reduce){.me{animation:none !important}}
+
 /* Map pins */
 .pin{width:18px;height:18px;border:3px solid #fff;background:var(--road);border-radius:50%;box-shadow:0 1px 5px rgba(0,0,0,.45)}
 .pin.b{background:var(--coral);border-radius:4px}
@@ -188,13 +208,14 @@ button.traffic[aria-pressed="false"]{opacity:.7}
 
   <section class="sheet" id="sheet" aria-label="Plan your trip">
     <div class="grab" aria-hidden="true"></div>
-    <div class="top"><h1>Go Map</h1><button type="button" class="traffic" id="traffic-pill" aria-pressed="true" title="Turn traffic on or off"><span class="tdot" id="tdot"></span><span id="ttext">Loading traffic…</span></button></div>
+    <div class="top"><h1>Byahe</h1><button type="button" class="traffic" id="traffic-pill" aria-pressed="true" title="Turn traffic on or off"><span class="tdot" id="tdot"></span><span id="ttext">Loading traffic…</span></button></div>
 
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-t="trip" aria-selected="true">Trip</button>
       <button class="tab" role="tab" data-t="jeep" aria-selected="false">Jeepney</button>
       <button class="tab" role="tab" data-t="bus" aria-selected="false">Bus</button>
       <button class="tab" role="tab" data-t="taxi" aria-selected="false">Taxi</button>
+      <button class="tab" role="tab" data-t="fares" aria-selected="false">Fares</button>
       <button class="tab" role="tab" data-t="lib" aria-selected="false">Library</button>
       <button class="tab" role="tab" data-t="set" aria-selected="false">Settings</button>
     </div>
@@ -220,7 +241,10 @@ button.traffic[aria-pressed="false"]{opacity:.7}
     <div class="chips" id="chips" role="group" aria-label="Popular places in Baguio"></div>
 
     <p id="status" role="status">Tap a pin button to place My Location or Destination/Stop on the map, or search for a place.</p>
+    <p class="info" id="track-info" hidden></p>
     <button id="retry" class="ghostbtn" type="button" hidden>Try again</button>
+    <div class="seg2 rider-seg" role="radiogroup" aria-label="Fare for"></div>
+    <div class="pills" id="alts" role="group" aria-label="Route choices" hidden></div>
     <div id="options"></div>
     <ol class="steps" id="steps" hidden></ol>
     <button id="confirm" hidden></button>
@@ -244,6 +268,13 @@ button.traffic[aria-pressed="false"]{opacity:.7}
     <div class="panel" id="p-taxi" hidden>
       <p class="info" id="taxi-info"></p>
       <button type="button" class="btn" id="taxi-me">Use my location</button>
+    </div>
+
+    <div class="panel" id="p-fares" hidden>
+      <p class="hint">Pick who is riding. Fares on the Trip tab use the discount from this table. Tap a number to change it.</p>
+      <div class="seg2 rider-seg" role="radiogroup" aria-label="Rider type"></div>
+      <div class="tablewrap"><table class="matrix" id="matrix"></table></div>
+      <p class="hint">Starting values are 20% for students, seniors and PWD, the usual legal rate on public transport. Tricycles, ride-hailing and motorcycle taxis can differ by city or operator, so check your source and edit the table.</p>
     </div>
 
     <div class="panel" id="p-lib" hidden>
@@ -283,6 +314,8 @@ button.traffic[aria-pressed="false"]{opacity:.7}
   </section>
 
   <button class="panel-toggle" id="panel-toggle" type="button" aria-controls="sheet" aria-expanded="true" aria-label="Hide panel, show full map"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+
+  <button class="locate-btn" id="locate" type="button" aria-pressed="false" aria-label="Track my location"><svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="3.2" fill="currentColor"/><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 1v3M10 16v3M1 10h3M16 10h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -326,7 +359,7 @@ function setPoint(k, latlng, label){
 function clearRoute(){
   if(routeLayer){ map.removeLayer(routeLayer); routeLayer = null; }
   tripTraffic.clearLayers();
-  route = null; selected = null; walk = null; hotBoost = 0;
+  route = null; selected = null; walk = null; hotBoost = 0; routes = []; $('#alts').hidden = true; $('#alts').dataset.sig = '';
   $('#options').innerHTML = ''; $('#confirm').hidden = true; $('#save-route').hidden = true; $('#retry').hidden = true; $('#steps').hidden = true;
 }
 
@@ -365,7 +398,7 @@ $('#loc').onclick = () => {
 map.on('click', e => mapTap(e));
 
 const settings={jeeps:true,taxis:true,terms:true,traffic:'auto',walk:15,sim:4,radar:300,b3d:true,roads:true,source:'sim'};
-let ttKey='', liveFactor=null, liveInfo='', routeBusy=false;
+let ttKey='', liveFactor=null, liveInfo='', routeBusy=false, routes=[], routeIdx=0, rider='regular', quietRoute=false;
 // Routing servers, tried in order. The second one is a backup in case the first is busy.
 const OSRM={driving:['https://router.project-osrm.org/route/v1/driving/','https://routing.openstreetmap.de/routed-car/route/v1/driving/'],foot:['https://routing.openstreetmap.de/routed-foot/route/v1/foot/']};
 /* ---- Simulated live traffic for Baguio (no real traffic feed, this is a simulation) ---- */
@@ -417,24 +450,24 @@ async function getRoute(){
   routeBusy=true; $('#retry').hidden=true; say('Finding the best route…');
   const a=pts.pickup, b=pts.drop, q=`${a.lng},${a.lat};${b.lng},${b.lat}`;
   try{
-    const [d,w]=await Promise.all([osrm('driving',q),osrm('foot',q)]);
+    const [d,w]=await Promise.all([osrm('driving',q,'overview=full&geometries=geojson&alternatives=3'),osrm('foot',q)]);
     const rt=d && d.code==='Ok' && d.routes[0];
     if(!rt){
       say(d ? 'No road route between those two places. They may be on different islands, or a pin is off the road network.' : 'The routing servers did not answer. Check your internet connection.');
       $('#retry').hidden=false; return;
     }
-    route={km:rt.distance/1000, min:rt.duration/60, geo:rt.geometry};
+    routes=d.routes.slice(0,3).map(x=>({km:x.distance/1000,min:x.duration/60,geo:x.geometry})); routeIdx=0; route=routes[0];
     const wt=w && w.code==='Ok' && w.routes[0];
     walk=wt ? {km:wt.distance/1000, geo:wt.geometry} : {km:route.km, geo:rt.geometry};
     hotBoost=Math.min(.2,hotspots(rt.geometry.coordinates)*.07);
     liveFactor=null; liveInfo='';
-    updateTraffic(); setPanel(true);
-    await draw('drive',true);
+    updateTraffic(); if(!quietRoute) setPanel(true);
+    await draw(selected ? selected.key : 'drive', !quietRoute);
     say(`${fmtDist(route.km)} by road. ${trafficWord()} Choose a ride or walk.`);
     $('#save-route').hidden=false;
     renderOptions();
     fetchLive();
-  } finally { routeBusy=false; }
+  } finally { routeBusy=false; quietRoute=false; }
 }
 $('#retry').onclick=()=>{ if(pts.pickup && pts.drop) getRoute(); };
 
@@ -486,6 +519,10 @@ async function draw(kind,fit){
       L.polyline(plan.ride,{color:'#fff',weight:2,opacity:.9,dashArray:'1 14',className:'flow',interactive:false}).addTo(g);   // shows the direction of travel
     }
   }
+  if(!plan && kind!=='walk' && routes.length>1) routes.forEach((r,i)=>{   // other route choices: grey, tap to switch
+    if(r===route) return;
+    L.polyline(r.geo.coordinates.map(c=>[c[1],c[0]]),{color:dark?'#7F929B':'#7B8A93',weight:6,opacity:.8,lineCap:'round',bubblingMouseEvents:false}).on('click',()=>selectRoute(i)).addTo(g);
+  });
   if(!plan && kind!=='walk') lane(route.geo.coordinates.map(c=>[c[1],c[0]]),brand,6);   // road route
   if(routeLayer) map.removeLayer(routeLayer);
   routeLayer=g.addTo(map);
@@ -514,12 +551,14 @@ function showSteps(kind,plan){   // step-by-step list under the options
 function quote(key,m){
   const walking=key==='walk';
   const mins=walking ? walk.km*settings.walk : route.min*trafficMult(key)*m.slow;
-  const fare=walking ? 0 : Math.round(m.base+Math.max(0,route.km-(m.freeKm||0))*m.perKm+(m.perMin||0)*mins);
-  return {fare, eta:Math.round(mins+(key==='taxi'?taxiWait():(m.wait||0))), km:walking?walk.km:route.km};
+  const full=walking ? 0 : Math.round(m.base+Math.max(0,route.km-(m.freeKm||0))*m.perKm+(m.perMin||0)*mins);
+  const pct=(DISC[key]||{})[rider]||0, fare=Math.round(full*(1-pct/100));   // student, senior or PWD discount
+  return {fare, full, pct, eta:Math.round(mins+(key==='taxi'?taxiWait():(m.wait||0))), km:walking?walk.km:route.km};
 }
 
 function renderOptions(){
   const box=$('#options'); box.innerHTML='';
+  rank(); renderAlts();
   let chosen=null;
   [...Object.entries(FARES),['walk',WALK]].forEach(([key,m])=>{
     if(m.maxKm && route.km>m.maxKm) return;
@@ -529,7 +568,7 @@ function renderOptions(){
     if(key==='jeep') note=t ? `take ${t.r.name} from ${t.a.s[0]} to ${t.b.s[0]}, walk ${fmtDist((t.a.w+t.b.w)/1000)} in total, next jeepney ${nextEta(t.r,t.a.s)}` : 'no route nearby, estimate from road distance';
     if(key==='bus') note=t ? `take ${t.r.name} from ${t.a.s[0]} to ${t.b.s[0]}` : 'no terminal near both places, estimate from road distance';
     b.className='opt'; b.setAttribute('aria-pressed',String(on)); b.style.setProperty('--c',t?t.r.color:m.color);
-    b.innerHTML=`<span class="ico" aria-hidden="true">${m.ico}</span><span class="name">${m.label}</span><span class="fare">${walking?fmtDist(q.km):'₱'+q.fare}</span><span class="sub">About ${q.eta} min, arrive ${arrive}${note?', '+note:''}</span>`;
+    b.innerHTML=`<span class="ico" aria-hidden="true">${m.ico}</span><span class="name">${m.label}${key===bestFast?'<em class="tag">Fastest</em>':''}${key===bestCheap?'<em class="tag">Cheapest</em>':''}</span><span class="fare">${walking?fmtDist(q.km):'₱'+q.fare}</span><span class="sub">About ${q.eta} min, arrive ${arrive}${note?', '+note:''}${q.pct?`, ${q.pct}% ${RLABEL[rider]} discount, was ₱${q.full}`:''}</span>`;
     b.onclick=()=>{ selected={key}; renderOptions(); draw(key,true); $('.opt[aria-pressed="true"]').focus(); };
     box.append(b);
     if(on) chosen={key,m,q};
@@ -760,7 +799,7 @@ function focusBus(id){
   const r=BUSES.find(x=>x.id===id);
   const h=r.min/60, b=FARES.bus;
   $('#bus-info').textContent = r.km
-    ? `${r.name}: about ${Math.round(r.km)} km by road, ${Math.floor(h)} h ${Math.round((h%1)*60)} min. Sample fare ₱${Math.round(b.base+Math.max(0,r.km-b.freeKm)*b.perKm)}.`
+    ? `${r.name}: about ${Math.round(r.km)} km by road, ${Math.floor(h)} h ${Math.round((h%1)*60)} min. Sample fare ₱${Math.round((b.base+Math.max(0,r.km-b.freeKm)*b.perKm)*(1-((DISC.bus||{})[rider]||0)/100))}${rider!=='regular'?` (${RLABEL[rider]} rate)`:''}.`
     : `${r.name}: road distance is not available yet. Try again in a moment.`;
   map.fitBounds(r.line ? r.line.getBounds() : L.latLngBounds(r.stops.map(s=>[s[1],s[2]])), pad());
 }
@@ -1093,6 +1132,131 @@ try{
 }catch(e){}
 $('#s-roads').checked=settings.roads; $('#s-source').value=settings.source; $('#keyrow').hidden=settings.source!=='live'; $('#s-key').value=ttKey;
 syncTraffic();
+
+/* ---- Fare discounts: one matrix for every ride and rider type ---- */
+const RLABEL={regular:'Regular',student:'Student',senior:'Senior',pwd:'PWD'};
+const RIDERS=Object.keys(RLABEL);
+// Percent off the fare. 20% is a placeholder for the usual legal rate on public transport.
+// Tricycles, ride-hailing and motorcycle taxis can differ by city or operator, so edit these or the Fares tab.
+const DISC=Object.fromEntries(Object.keys(FARES).map(k=>[k,{student:20,senior:20,pwd:20}]));
+const saveFares=()=>{ try{ localStorage.setItem('byahe-fares',JSON.stringify({rider,disc:DISC})); }catch(e){} };
+try{
+  const f=JSON.parse(localStorage.getItem('byahe-fares')||'{}');
+  if(f.rider && RLABEL[f.rider]) rider=f.rider;
+  if(f.disc) Object.keys(DISC).forEach(k=>{ if(f.disc[k]) Object.assign(DISC[k],f.disc[k]); });
+}catch(e){}
+function renderRiders(){
+  document.querySelectorAll('.rider-seg').forEach(box=>{
+    box.innerHTML='';
+    RIDERS.forEach(k=>{
+      const b=document.createElement('button'); b.type='button'; b.setAttribute('role','radio'); b.setAttribute('aria-checked',String(k===rider)); b.textContent=RLABEL[k];
+      b.onclick=()=>{ rider=k; saveFares(); renderRiders(); renderMatrix(); if(route) renderOptions(); };
+      box.append(b);
+    });
+  });
+}
+function renderMatrix(){
+  const t=$('#matrix'); t.innerHTML='';
+  const hr=t.createTHead().insertRow();
+  ['Ride',...RIDERS.map(k=>RLABEL[k])].forEach((h,i)=>{ const th=document.createElement('th'); th.textContent=h; if(i && RIDERS[i-1]===rider) th.className='on'; hr.append(th); });
+  const body=t.createTBody();
+  [...Object.entries(FARES),['walk',WALK]].forEach(([key,m])=>{
+    const tr=body.insertRow(); tr.insertCell().textContent=`${m.ico} ${m.label}`;
+    if(key==='walk'){ const c=tr.insertCell(); c.colSpan=4; c.textContent='Free'; return; }
+    const c0=tr.insertCell(); c0.textContent='0%'; if(rider==='regular') c0.className='on';
+    ['student','senior','pwd'].forEach(r=>{
+      const c=tr.insertCell(), inp=document.createElement('input');
+      inp.type='number'; inp.min=0; inp.max=100; inp.value=DISC[key][r]; inp.setAttribute('aria-label',`${m.label}, ${RLABEL[r]} discount percent`);
+      inp.onchange=()=>{ DISC[key][r]=clamp(+inp.value||0,0,100); inp.value=DISC[key][r]; saveFares(); if(route) renderOptions(); };
+      c.append(inp); if(r===rider) c.className='on';
+    });
+  });
+}
+renderRiders(); renderMatrix();
+
+/* ---- Recommended routes: Fastest / Cheapest tags and road alternatives ---- */
+let bestFast=null, bestCheap=null;
+function rank(){
+  const all=[...Object.entries(FARES),['walk',WALK]].filter(([k,m])=>!(m.maxKm && route.km>m.maxKm)).map(([k,m])=>[k,quote(k,m)]);
+  const pick=(f,list)=>list.reduce((a,b)=>f(b[1])<f(a[1])?b:a)[0];
+  bestFast=pick(q=>q.eta,all);
+  bestCheap=pick(q=>q.fare,all.filter(([k,q])=>k!=='walk' || q.km<=1.2));   // walking only counts as cheapest for short trips
+}
+function renderAlts(){
+  const box=$('#alts'); box.hidden=routes.length<2;
+  if(routes.length<2) return;
+  const fast=routes.reduce((a,b)=>b.min<a.min?b:a), short=routes.reduce((a,b)=>b.km<a.km?b:a);
+  const labels=routes.map((r,i)=>`Route ${i+1}: ${Math.round(r.min*trafficMult('car'))} min, ${fmtDist(r.km)}${r===fast?', fastest':r===short?', shortest':''}`);
+  const sig=labels.join('|')+routeIdx; if(box.dataset.sig===sig) return;   // only rebuild when something changed
+  box.dataset.sig=sig; box.innerHTML='';
+  labels.forEach((txt,i)=>{
+    const b=document.createElement('button'); b.type='button'; b.className='rt'; b.setAttribute('aria-pressed',String(i===routeIdx)); b.style.setProperty('--c','var(--road)');
+    b.innerHTML='<i></i>'; b.append(txt); b.onclick=()=>selectRoute(i); box.append(b);
+  });
+}
+function selectRoute(i){
+  routeIdx=i; route=routes[i];
+  hotBoost=Math.min(.2,hotspots(route.geo.coordinates)*.07);
+  liveFactor=null; liveInfo='';
+  updateTraffic(); renderOptions(); draw(selected ? selected.key : 'drive', false);
+  say(`Route ${i+1}: ${fmtDist(route.km)} by road. ${trafficWord()}`);
+  fetchLive();
+}
+
+/* ---- Follow my location while I move (uses the phone's location service) ---- */
+let watchId=null, follow=true, meMarker=null, meCircle=null, lastReroute=0, wakeLock=null;
+const locBtn=$('#locate');
+function locState(){
+  const on=watchId!==null;
+  locBtn.setAttribute('aria-pressed',String(on)); locBtn.classList.toggle('paused',on && !follow);
+  locBtn.setAttribute('aria-label',!on?'Track my location':!follow?'Follow my location again':'Stop tracking my location');
+}
+async function keepAwake(){ try{ if(navigator.wakeLock && watchId!==null) wakeLock=await navigator.wakeLock.request('screen'); }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) keepAwake(); });
+function startTracking(){
+  if(!navigator.geolocation) return say('This device cannot share its location.');
+  follow=true; say('Finding your location. Allow location access if the browser asks.');
+  watchId=navigator.geolocation.watchPosition(onFix,onFixError,{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
+  keepAwake(); locState();
+}
+function stopTracking(){
+  if(watchId!==null) navigator.geolocation.clearWatch(watchId);
+  watchId=null;
+  if(meMarker){ map.removeLayer(meMarker); map.removeLayer(meCircle); meMarker=meCircle=null; }
+  if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
+  $('#track-info').hidden=true; locState();
+}
+function onFixError(err){
+  if(err.code===1){ stopTracking(); say('Location is blocked. Turn on Location in your phone settings and allow it for this browser, then try again.'); }
+  else say(err.code===3 ? 'Your location is taking a while. Move somewhere open and keep this page on screen.' : 'Your location is not available right now.');
+}
+function onFix(p){
+  const ll=L.latLng(p.coords.latitude,p.coords.longitude), acc=p.coords.accuracy||30;
+  const first=!meMarker;
+  if(first){
+    meMarker=L.marker(ll,{icon:L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[22,22],iconAnchor:[11,11]}),zIndexOffset:1000,keyboard:false,interactive:false}).addTo(map);
+    meCircle=L.circle(ll,{radius:acc,color:'#2B7FFF',weight:1,fillOpacity:.1,interactive:false}).addTo(map);
+  } else { meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(acc); }
+  if(!pts.pickup) setPoint('pickup',ll,'My location');   // the first fix becomes My Location
+  else if($('#q-pickup').value==='My location' && map.distance(pts.pickup,ll)>30 && Date.now()-lastReroute>12000){ lastReroute=Date.now(); reroute(ll); }
+  if(first) map.setView(ll,Math.max(map.getZoom(),17)); else if(follow) map.panTo(ll,{animate:true});
+  const d=pts.drop ? map.distance(ll,pts.drop) : null, ti=$('#track-info');
+  ti.hidden=false;
+  ti.textContent = d===null ? `Tracking you. Accuracy about ${Math.round(acc)} m.` : d<25 ? 'You have arrived.' : `${fmtDist(d/1000)} to your destination in a straight line. Accuracy about ${Math.round(acc)} m.`;
+}
+async function reroute(ll){   // you moved: update My Location and refresh the route, keeping your chosen ride
+  pts.pickup={lat:ll.lat,lng:ll.lng};
+  if(markers.pickup) markers.pickup.setLatLng(ll);
+  if(!pts.drop){ if(taxiC && map.distance(taxiC,ll)>150) spawnTaxis(ll); return; }
+  const keep=selected; quietRoute=true; clearRoute(); selected=keep;
+  await getRoute();
+}
+locBtn.onclick=()=>{
+  if(watchId===null) startTracking();
+  else if(!follow){ follow=true; if(meMarker) map.panTo(meMarker.getLatLng()); locState(); }
+  else stopTracking();
+};
+map.on('dragstart',()=>{ if(watchId!==null && follow){ follow=false; locState(); } });   // dragging the map pauses following
 </script>
 </body>
 </html>

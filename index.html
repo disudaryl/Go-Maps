@@ -142,6 +142,30 @@ h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.7rem
 .theming,.theming *,.theming *::before,.theming *::after{transition:background-color .45s ease,color .45s ease,border-color .45s ease,fill .45s ease,stroke .45s ease,box-shadow .45s ease,filter .6s ease !important}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms !important;animation-duration:.01ms !important}}
 
+/* Pin mode, library, 3D, traffic marks */
+.pinbtn{display:grid;place-items:center;background:var(--mist);color:var(--road);padding:8px 9px !important}
+.pinbtn[aria-pressed="true"]{background:var(--signal);color:#13222B}
+.field.armed{border-color:var(--signal);box-shadow:0 0 0 3px rgba(255,194,14,.35)}
+#map.pinning{cursor:crosshair}
+.ghostbtn{width:100%;margin-top:8px;border:1.5px solid var(--road);background:none;color:var(--road);border-radius:12px;padding:11px;font-weight:600;cursor:pointer}
+.sub{font-family:'Bricolage Grotesque',sans-serif;font-size:1.05rem;margin:16px 0 4px;color:var(--road)}
+.lib{list-style:none;margin:0;padding:0}
+.lib li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 2px;border-bottom:1px solid var(--mist)}
+.lname{min-width:0;display:flex;flex-direction:column}
+.lname span{font-size:.82rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lact{display:flex;gap:6px;flex:none}
+.lact button{border:1.5px solid var(--mist);background:var(--card);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:.85rem}
+.lib .empty{color:var(--muted);font-size:.9rem}
+.addrow{display:flex;gap:8px;margin-top:10px}
+.addrow input{flex:1;min-width:0;border:1.5px solid var(--mist);background:var(--card);border-radius:10px;padding:9px 12px}
+.addrow .btn{margin-top:0}
+.row small{color:var(--muted);font-weight:400}
+.lg{display:inline-block;width:14px;height:6px;border-radius:3px;margin:0 5px 1px 12px;vertical-align:middle}
+.lg:first-child{margin-left:0}
+.lg.y{background:#F2C200}.lg.r{background:#D43F2F}.lg.k{background:#000;border:1px solid #888}
+.shut{display:grid;place-items:center;width:24px;height:24px;font-size:20px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+.bldg-canvas{position:absolute;left:0;top:0;pointer-events:none;transition:opacity .25s}
+
 /* Map pins */
 .pin{width:18px;height:18px;border:3px solid #fff;background:var(--road);border-radius:50%;box-shadow:0 1px 5px rgba(0,0,0,.45)}
 .pin.b{background:var(--coral);border-radius:4px}
@@ -160,13 +184,15 @@ h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.7rem
       <button class="tab" role="tab" data-t="jeep" aria-selected="false">Jeepney</button>
       <button class="tab" role="tab" data-t="bus" aria-selected="false">Bus</button>
       <button class="tab" role="tab" data-t="taxi" aria-selected="false">Taxi</button>
+      <button class="tab" role="tab" data-t="lib" aria-selected="false">Library</button>
       <button class="tab" role="tab" data-t="set" aria-selected="false">Settings</button>
     </div>
 
     <div class="panel" id="p-trip">
     <form class="field" id="f-pickup">
       <span class="dot" aria-hidden="true"></span>
-      <input id="q-pickup" placeholder="Pickup" aria-label="Pickup location" autocomplete="off">
+      <input id="q-pickup" placeholder="My Location" aria-label="My Location" autocomplete="off">
+      <button type="button" class="pinbtn" data-k="pickup" aria-pressed="false" aria-label="Place My Location pin on the map"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 18s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="8" r="2.2" fill="currentColor"/></svg></button>
       <button type="button" class="loc" id="loc" aria-label="Use my current location">Me</button>
       <button class="find">Find</button>
     </form>
@@ -174,16 +200,18 @@ h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.7rem
 
     <form class="field" id="f-drop">
       <span class="dot b" aria-hidden="true"></span>
-      <input id="q-drop" placeholder="Where to?" aria-label="Drop-off location" autocomplete="off">
+      <input id="q-drop" placeholder="Destination/Stop" aria-label="Destination/Stop" autocomplete="off">
+      <button type="button" class="pinbtn" data-k="drop" aria-pressed="false" aria-label="Place Destination/Stop pin on the map"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 18s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="8" r="2.2" fill="currentColor"/></svg></button>
       <button class="find">Find</button>
     </form>
     <ul class="hits" id="hits-drop"></ul>
 
     <div class="chips" id="chips" role="group" aria-label="Popular places in Baguio"></div>
 
-    <p id="status" role="status">Search for a place, or tap the map to drop a pin.</p>
+    <p id="status" role="status">Tap a pin button to place My Location or Destination/Stop on the map, or search for a place.</p>
     <div id="options"></div>
     <button id="confirm" hidden></button>
+    <button id="save-route" class="ghostbtn" type="button" hidden>Save route</button>
 
     </div>
 
@@ -205,6 +233,18 @@ h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.7rem
       <button type="button" class="btn" id="taxi-me">Use my location</button>
     </div>
 
+    <div class="panel" id="p-lib" hidden>
+      <p class="hint">Pin or search a place on the Trip tab, then tap Set (or Add) to save it here.</p>
+      <h2 class="sub">Saved places</h2>
+      <ul class="lib" id="lib-places"></ul>
+      <div class="addrow"><input id="lib-name" placeholder="Name a new place, e.g. Gym" aria-label="Name for a new place"><button type="button" class="btn" id="lib-add">Add</button></div>
+      <p class="info" id="lib-msg"></p>
+      <h2 class="sub">Saved routes</h2>
+      <ul class="lib" id="lib-routes"></ul>
+      <h2 class="sub">Recents</h2>
+      <ul class="lib" id="lib-recents"></ul>
+    </div>
+
     <div class="panel" id="p-set" hidden>
       <div class="row"><span id="theme-label">Appearance</span>
         <div class="seg" role="radiogroup" aria-labelledby="theme-label">
@@ -214,9 +254,12 @@ h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.7rem
         </div>
       </div>
       <label class="row"><span>Show moving jeepneys</span><input type="checkbox" id="s-jeeps" checked></label>
-      <label class="row"><span>Show nearby taxis</span><input type="checkbox" id="s-taxis" checked></label>
+      <label class="row"><span>Show nearby taxis and jeeps</span><input type="checkbox" id="s-taxis" checked></label>
       <label class="row"><span>Taxi radar range</span><select id="s-radar"><option value="150">150 m</option><option value="300" selected>300 m</option><option value="500">500 m</option></select></label>
       <label class="row"><span>Show bus routes and terminals</span><input type="checkbox" id="s-terms" checked></label>
+      <label class="row"><span>3D buildings <small>(zoom in to see)</small></span><input type="checkbox" id="s-b3d" checked></label>
+      <label class="row"><span>Traffic on the map</span><input type="checkbox" id="s-roads" checked></label>
+      <p class="hint"><i class="lg y"></i>Mild<i class="lg r"></i>Heavy<i class="lg k"></i>Closed ⛔️ (simulated)</p>
       <label class="row"><span>Traffic</span><select id="s-traffic"><option value="auto">Automatic (simulated)</option><option value="light">Light</option><option value="moderate">Moderate</option><option value="heavy">Heavy</option></select></label>
       <label class="row"><span>Walking pace</span><select id="s-walk"><option value="15">Normal (hilly)</option><option value="12">Fast</option><option value="20">Slow</option></select></label>
       <label class="row"><span>Vehicle speed on the map</span><select id="s-sim"><option value="1">Real time</option><option value="4" selected>4x, easier to watch</option><option value="10">10x</option></select></label>
@@ -266,8 +309,9 @@ function setPoint(k, latlng, label){
 
 function clearRoute(){
   if(routeLayer){ map.removeLayer(routeLayer); routeLayer = null; }
+  tripTraffic.clearLayers();
   route = null; selected = null; walk = null; hotBoost = 0;
-  $('#options').innerHTML = ''; $('#confirm').hidden = true;
+  $('#options').innerHTML = ''; $('#confirm').hidden = true; $('#save-route').hidden = true;
 }
 
 /* Search places in the Philippines (Nominatim: free, keep to one search per tap) */
@@ -302,11 +346,11 @@ $('#loc').onclick = () => {
 };
 
 /* Tap the map: first tap sets pickup, later taps set drop-off */
-map.on('click', e => setPoint(pts.pickup ? 'drop' : 'pickup', e.latlng, 'Pinned location'));
+map.on('click', e => mapTap(e));
 
-const settings={jeeps:true,taxis:true,terms:true,traffic:'auto',walk:15,sim:4,radar:300};
+const settings={jeeps:true,taxis:true,terms:true,traffic:'auto',walk:15,sim:4,radar:300,b3d:true,roads:true};
 /* ---- Simulated live traffic for Baguio (no real traffic feed, this is a simulation) ---- */
-const LEVELS=[{max:.35,n:'Light',c:'#2E9E5B'},{max:.65,n:'Moderate',c:'#E0A100'},{max:1.01,n:'Heavy',c:'#D43F2F'}];
+const LEVELS=[{max:.35,n:'Light',c:'#2E9E5B'},{max:.65,n:'Moderate',c:'#F2C200'},{max:1.01,n:'Heavy',c:'#D43F2F'}];
 const TF={taxi:1,car:1,moto:.6,trike:.8,jeep:1.1,bus:1.2};   // how much traffic slows each ride
 const WALK={label:'Walk',ico:'🚶',color:'#5B6B72',slow:1,wait:0,note:'Free, allow extra time on hills',maxKm:15};
 const WALK_MIN_PER_KM=15;   // about 4 km/h, Baguio is hilly
@@ -354,13 +398,15 @@ async function getRoute(){
   setPanel(true);
   draw('drive',true);
   say(`${fmtDist(route.km)} by road. ${level().n} traffic right now. Choose a ride or walk.`);
+  $('#save-route').hidden=false;
   renderOptions();
 }
 
 function draw(kind,fit){
   if(routeLayer) map.removeLayer(routeLayer);
   const isWalk=kind==='walk';
-  routeLayer=L.geoJSON(isWalk?walk.geo:route.geo,{style:{color:isWalk?(document.documentElement.dataset.theme==='dark'?'#E8F0F2':'#13222B'):level().c,weight:6,opacity:.9,dashArray:isWalk?'2 10':null,lineCap:'round'}}).addTo(map);
+  routeLayer=L.geoJSON(isWalk?walk.geo:route.geo,{style:{color:isWalk?(document.documentElement.dataset.theme==='dark'?'#E8F0F2':'#13222B'):(document.documentElement.dataset.theme==='dark'?'#5CB8D6':'#0F3D4C'),weight:6,opacity:.9,dashArray:isWalk?'2 10':null,lineCap:'round'}}).addTo(map);
+  isWalk ? tripTraffic.clearLayers() : paintTraffic();   // yellow and red stretches on the trip route
   if(!fit) return;
   const mobile=matchMedia('(max-width:767px)').matches;
   map.fitBounds(routeLayer.getBounds(),pad());
@@ -533,7 +579,7 @@ async function spawnTaxis(c){
   taxiGroup.clearLayers(); taxis=[]; taxiC=L.latLng(c);
   L.circle(taxiC,{radius:R,color:'#5CB8D6',weight:1.5,fillColor:'#5CB8D6',fillOpacity:.08,interactive:false}).addTo(taxiGroup);
   ring=L.circle(taxiC,{radius:1,color:'#5CB8D6',weight:2,fill:false,opacity:0,interactive:false}).addTo(taxiGroup);
-  for(let i=0;i<6;i++){   // one road chord per taxi: in on one side, out on the other
+  for(let i=0;i<8;i++){   // one road chord per vehicle (5 taxis, 3 jeeps): in on one side, out on the other
     const a=Math.random()*6.283, b=a+3.1416+(Math.random()-.5)*1.2;
     const from=offset(taxiC,R*Math.cos(a),R*Math.sin(a)), to=offset(taxiC,R*Math.cos(b),R*Math.sin(b));
     await new Promise(z=>setTimeout(z,300));   // be gentle with the free routing server
@@ -542,9 +588,9 @@ async function spawnTaxis(c){
       const d=await (await fetch(`https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`)).json();
       if(token!==radarToken) return;
       if(d.code!=='Ok') continue;
-      const t={stops:[],d:0,wait:Math.random()*5,seen:false,vis:false};
+      const t={stops:[],kind:i<5?'taxi':'jeep',d:0,wait:Math.random()*5,seen:false,vis:false};
       buildPath(t,d.routes[0].geometry.coordinates.map(q=>[q[1],q[0]]));
-      t.mk=L.marker(t.path[0],{icon:vehIcon('T','#FFC20E','#13222B'),keyboard:false,interactive:false,opacity:0}).addTo(taxiGroup);
+      t.mk=L.marker(t.path[0],{icon:(t.kind==='taxi' ? vehIcon('T','#FFC20E','#13222B') : vehIcon('J','#3A7CA5')),keyboard:false,interactive:false,opacity:0}).addTo(taxiGroup);
       taxis.push(t);
     }catch(err){}
   }
@@ -554,7 +600,7 @@ function moveTaxis(dt){
   const R=settings.radar;
   taxis.forEach(t=>{
     if(t.wait>0){ t.wait-=dt; return; }
-    t.d+=7*settings.sim*(1-.5*traffic)*dt;   // about 7 m/s
+    t.d+=(t.kind==='jeep'?5:7)*settings.sim*(1-.5*traffic)*dt;   // taxis about 7 m/s, jeeps 5 m/s
     const p=pointAt(t,Math.min(t.d,t.len)), dist=map.distance(p,taxiC);
     if(dist<R*.92) t.seen=true;
     if(t.d>=t.len || (t.seen && dist>R)){   // left the radar: vanish, then re-enter later
@@ -565,7 +611,7 @@ function moveTaxis(dt){
   });
 }
 function taxiWait(){   // minutes for the nearest taxi inside the radar to reach the pickup
-  const near=taxis.filter(t=>t.vis).map(t=>map.distance(t.mk.getLatLng(),pts.pickup||taxiC));
+  const near=taxis.filter(t=>t.kind==='taxi'&&t.vis).map(t=>map.distance(t.mk.getLatLng(),pts.pickup||taxiC));
   return near.length ? Math.max(1,Math.round(Math.min(...near)/(330*(1-.4*traffic)))) : 3;
 }
 (function pulse(now){   // radar ping
@@ -624,15 +670,17 @@ const toggle=(g,on)=>map[on?'addLayer':'removeLayer'](g);
 bind('#s-jeeps',el=>{settings.jeeps=el.checked; toggle(jeepGroup,el.checked);});
 bind('#s-taxis',el=>{settings.taxis=el.checked; toggle(taxiGroup,el.checked);});
 bind('#s-radar',el=>{settings.radar=+el.value; if(taxiC) spawnTaxis(taxiC);});
+bind('#s-b3d',el=>{settings.b3d=el.checked; if(el.checked) loadArea(); drawBuildings();});
+bind('#s-roads',el=>{settings.roads=el.checked; toggle(trafficGroup,el.checked); if(el.checked) loadArea();});
 bind('#s-terms',el=>{settings.terms=el.checked; toggle(busGroup,el.checked);});
-bind('#s-traffic',el=>{settings.traffic=el.value; tick();});
+bind('#s-traffic',el=>{settings.traffic=el.value; tick(); drawTraffic();});
 bind('#s-walk',el=>{settings.walk=+el.value; if(route) renderOptions();});
 bind('#s-sim',el=>{settings.sim=+el.value;});
 
 /* ---- Movement loop ---- */
 function refreshInfo(){
   $('#taxi-info').textContent = settings.taxis
-    ? (taxiC ? `${taxis.filter(t=>t.vis).length} taxis inside the ${settings.radar} m radar. The nearest is about ${taxiWait()} min away.` : 'Set a pickup, or tap Use my location, to see taxis around you.')
+    ? (taxiC ? `${taxis.filter(t=>t.kind==='taxi'&&t.vis).length} taxis and ${taxis.filter(t=>t.kind==='jeep'&&t.vis).length} jeeps inside the ${settings.radar} m radar. The nearest taxi is about ${taxiWait()} min away.` : 'Set a pickup, or tap Use my location, to see taxis around you.')
     : 'Nearby taxis are switched off in Settings.';
   if(focusId){
     const r=JEEPS.find(x=>x.id===focusId);
@@ -657,6 +705,7 @@ function applyTheme(animate){
   document.documentElement.dataset.theme=dark?'dark':'light';
   document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-checked',String(b.dataset.m===themeMode)));
   if(route) draw(selected && selected.key==='walk' ? 'walk' : 'drive', false);   // recolor the trip line
+  try{ drawBuildings(); }catch(e){}
 }
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
   themeMode=b.dataset.m;
@@ -676,6 +725,191 @@ function setPanel(open){
 }
 toggleBtn.onclick=()=>setPanel(sheet.classList.contains('collapsed'));
 new ResizeObserver(()=>appEl.style.setProperty('--sheet-h',sheet.offsetHeight+'px')).observe(sheet);
+
+/* ---- Pin mode: the field you pick decides which pin the next map tap places ---- */
+let armed=null, lastPoint=null;
+function arm(k){
+  armed=k;
+  $('#f-pickup').classList.toggle('armed',k==='pickup'); $('#f-drop').classList.toggle('armed',k==='drop');
+  document.querySelectorAll('.pinbtn').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.k===k)));
+  $('#map').classList.toggle('pinning',!!k);
+  if(k) say(`Tap the map to place your ${k==='pickup'?'My Location':'Destination/Stop'} pin, or type a place and press Find.`);
+}
+document.querySelectorAll('.pinbtn').forEach(b=>b.onclick=()=>{
+  const k=b.dataset.k;
+  if(armed===k) return arm(null);
+  arm(k); $('#q-'+k).blur();
+  if(matchMedia('(max-width:767px)').matches) setPanel(false);   // full map so the pin is easy to place
+});
+function mapTap(e){
+  const k=armed || (!pts.pickup?'pickup':!pts.drop?'drop':null);
+  if(!k) return say('Tap a pin button first (My Location or Destination/Stop), then tap the map.');
+  setPoint(k,e.latlng,`Pin at ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`); setPanel(true);
+}
+
+/* ---- Library: saved places, saved routes and recents (kept in this browser) ---- */
+const LIBKEY='byahe-library';
+const lib={home:null,work:null,custom:[],routes:[],recents:[]};
+try{ Object.assign(lib,JSON.parse(localStorage.getItem(LIBKEY)||'{}')); }catch(e){}
+const store=()=>{ try{ localStorage.setItem(LIBKEY,JSON.stringify(lib)); }catch(e){} renderLib(); };
+function addRecent(label,l){ lib.recents=[{label,lat:l.lat,lng:l.lng},...lib.recents.filter(r=>r.label!==label)].slice(0,8); store(); }
+const _sp2=setPoint;
+setPoint=(k,l,t)=>{
+  _sp2(k,l,t); lastPoint={lat:l.lat,lng:l.lng,label:t};
+  if(t!=='My location') addRecent(t,l);
+  arm(k==='pickup' && !pts.drop ? 'drop' : k==='drop' && !pts.pickup ? 'pickup' : null);   // then the other field is next
+};
+const useFor=(l,name)=>setPoint(armed||(!pts.pickup?'pickup':'drop'),{lat:l.lat,lng:l.lng},name||l.label);
+function row(title,sub,actions){
+  const li=document.createElement('li');
+  li.innerHTML='<div class="lname"><b></b><span></span></div><div class="lact"></div>';
+  li.querySelector('b').textContent=title; li.querySelector('span').textContent=sub;
+  actions.forEach(([txt,fn])=>{ const b=document.createElement('button'); b.type='button'; b.textContent=txt; b.onclick=fn; li.querySelector('.lact').append(b); });
+  return li;
+}
+function assign(key){
+  if(!lastPoint) return $('#lib-msg').textContent='Pin or search a place on the Trip tab first.';
+  lib[key]={lat:lastPoint.lat,lng:lastPoint.lng,label:lastPoint.label}; $('#lib-msg').textContent=''; store();
+}
+function renderLib(){
+  const P=$('#lib-places'), R=$('#lib-routes'), C=$('#lib-recents'); P.innerHTML=R.innerHTML=C.innerHTML='';
+  [['home','Home'],['work','Work']].forEach(([key,name])=>{
+    const v=lib[key]; P.append(row(name, v?v.label:'Not set', [...(v?[['Use',()=>useFor(v,name)]]:[]),['Set',()=>assign(key)]]));
+  });
+  lib.custom.forEach((v,i)=>P.append(row(v.name,v.label,[['Use',()=>useFor(v,v.name)],['Remove',()=>{ lib.custom.splice(i,1); store(); }]])));
+  lib.routes.forEach((v,i)=>R.append(row(v.name,'',[['Go',()=>{ setPoint('pickup',v.from,v.from.label); setPoint('drop',v.to,v.to.label); showTab('trip'); }],['Remove',()=>{ lib.routes.splice(i,1); store(); }]])));
+  if(!lib.routes.length) R.innerHTML='<li class="empty">No saved routes yet. Plan a trip, then tap Save route.</li>';
+  lib.recents.forEach(v=>C.append(row(v.label,'',[['Use',()=>useFor(v)]])));
+  if(!lib.recents.length) C.innerHTML='<li class="empty">Places you search or pin will show up here.</li>';
+}
+$('#lib-add').onclick=()=>{
+  const n=$('#lib-name').value.trim();
+  if(!n) return $('#lib-msg').textContent='Type a name for the place first.';
+  if(!lastPoint) return $('#lib-msg').textContent='Pin or search a place on the Trip tab first.';
+  lib.custom.push({name:n,lat:lastPoint.lat,lng:lastPoint.lng,label:lastPoint.label}); $('#lib-name').value=''; $('#lib-msg').textContent=''; store();
+};
+$('#save-route').onclick=()=>{
+  if(!pts.pickup||!pts.drop) return;
+  const from={lat:pts.pickup.lat,lng:pts.pickup.lng,label:$('#q-pickup').value}, to={lat:pts.drop.lat,lng:pts.drop.lng,label:$('#q-drop').value};
+  lib.routes=[{name:`${from.label} to ${to.label}`,from,to},...lib.routes].slice(0,10); store(); say('Route saved to your Library.');
+};
+/* Typing or focusing a field suggests saved places and recents (online search runs on Find) */
+function suggest(k){
+  const q=$('#q-'+k).value.trim().toLowerCase(), ul=$('#hits-'+k);
+  const saved=[['Home',lib.home],['Work',lib.work],...lib.custom.map(c=>[c.name,c])].filter(([n,v])=>v && n.toLowerCase().includes(q)).map(([n,v])=>['★ '+n,v,n]);
+  const rec=lib.recents.filter(r=>r.label.toLowerCase().includes(q)).slice(0,4).map(r=>['↺ '+r.label,r,r.label]);
+  ul.innerHTML='';
+  [...saved,...rec].slice(0,6).forEach(([txt,v,label])=>{
+    const li=document.createElement('li'), b=document.createElement('button');
+    b.type='button'; b.textContent=txt; b.onclick=()=>setPoint(k,{lat:v.lat,lng:v.lng},label); li.append(b); ul.append(li);
+  });
+}
+['pickup','drop'].forEach(k=>{ const inp=$('#q-'+k); inp.addEventListener('input',()=>suggest(k)); inp.addEventListener('focus',()=>{ arm(k); suggest(k); }); });
+
+/* ---- Map data from OpenStreetMap (Overpass): main roads for traffic, buildings for 3D ---- */
+map.createPane('bldg').style.zIndex=250; map.createPane('traffic').style.zIndex=350;
+const trafficGroup=L.layerGroup().addTo(map), tripTraffic=L.layerGroup().addTo(map), roadRenderer=L.canvas({pane:'traffic'});
+let roadData=null, bldData=null, roadBox=null, bldBox=null, areaTimer=null;
+const inBox=(b,v)=>b && v.getSouth()>=b.south && v.getNorth()<=b.north && v.getWest()>=b.west && v.getEast()<=b.east;
+async function overpass(q){ const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)}); return (await r.json()).elements; }
+function loadArea(){
+  clearTimeout(areaTimer);
+  areaTimer=setTimeout(async()=>{
+    const z=map.getZoom(), v=map.getBounds(), w=v.pad(.25), box={south:w.getSouth(),north:w.getNorth(),west:w.getWest(),east:w.getEast()};
+    const bb=`${box.south},${box.west},${box.north},${box.east}`;
+    try{
+      if(settings.roads && z>=14 && !inBox(roadBox,v)){
+        roadData=await overpass(`[out:json][timeout:25];way["highway"~"^(trunk|primary|secondary|tertiary)$"](${bb});out geom 800;`); roadBox=box; drawTraffic();
+      }
+      if(settings.b3d && z>=16 && !inBox(bldBox,v)){
+        bldData=await overpass(`[out:json][timeout:25];way["building"](${bb});out geom 2500;`); bldBox=box; drawBuildings();
+      }
+    }catch(e){}   // the free server can be busy; it retries on the next map move
+  },700);
+}
+map.on('moveend',loadArea);
+
+/* ---- Simulated traffic on the map: yellow = mild, red = heavy, black + ⛔️ = closed ---- */
+const hash=str=>{ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); } return ((h>>>0)%1000)/1000; };
+const cellOf=p=>Math.round(p.lat*400)+':'+Math.round(p.lng*400);   // about 280 m cells
+function segLevel(p){   // 0 free, 1 mild, 2 heavy
+  const near=HOT.some(h=>map.distance(p,h)<350)?.25:0;
+  const v=traffic*.75+near+(hash(cellOf(p)+':'+Math.floor(Date.now()/30000))-.5)*.5;
+  return v>.62?2:v>.4?1:0;
+}
+function chunks(line,len=180){   // split a line into pieces of about len meters
+  const out=[]; let cur=[line[0]], acc=0;
+  for(let i=1;i<line.length;i++){
+    acc+=map.distance(line[i-1],line[i]); cur.push(line[i]);
+    if(acc>=len || i===line.length-1){ out.push(cur); cur=[line[i]]; acc=0; }
+  }
+  return out;
+}
+function drawTraffic(){
+  trafficGroup.clearLayers();
+  if(!roadData) return;
+  let marks=0;
+  roadData.forEach(w=>{
+    if(!w.geometry) return;
+    chunks(w.geometry.map(g=>L.latLng(g.lat,g.lon))).forEach(c=>{
+      const m=c[Math.floor(c.length/2)], shut=hash('x'+cellOf(m))>.9985, lv=shut?3:segLevel(m);
+      if(!lv) return;
+      L.polyline(c,{pane:'traffic',renderer:roadRenderer,color:lv===3?'#000':lv===2?'#D43F2F':'#F2C200',weight:lv===3?9:8,opacity:.88,lineCap:'butt',interactive:false}).addTo(trafficGroup);
+      if(shut && marks++<14) L.marker(m,{icon:L.divIcon({className:'',html:'<div class="shut">⛔️</div>',iconSize:[24,24],iconAnchor:[12,12]}),keyboard:false}).bindPopup('Road closed (simulated)').addTo(trafficGroup);
+    });
+  });
+}
+function paintTraffic(){   // color the trip route by stretch
+  tripTraffic.clearLayers();
+  chunks(route.geo.coordinates.map(c=>L.latLng(c[1],c[0])),150).forEach(c=>{
+    const lv=segLevel(c[Math.floor(c.length/2)]);
+    if(lv) L.polyline(c,{color:lv===2?'#D43F2F':'#F2C200',weight:6,opacity:.95,lineCap:'round',interactive:false}).addTo(tripTraffic);
+  });
+}
+setInterval(()=>{ if(settings.roads) drawTraffic(); },15000);
+
+/* ---- 3D building blocks: footprints from OpenStreetMap, extruded on a canvas (heights are exaggerated) ---- */
+const bCanvas=document.createElement('canvas'); bCanvas.className='bldg-canvas';
+map.getPane('bldg').appendChild(bCanvas);
+const bctx=bCanvas.getContext('2d');
+let bldRaf=0;
+function drawBuildings(){
+  cancelAnimationFrame(bldRaf);
+  bldRaf=requestAnimationFrame(()=>{
+    const size=map.getSize(), dpr=window.devicePixelRatio||1;
+    bCanvas.width=size.x*dpr; bCanvas.height=size.y*dpr; bCanvas.style.width=size.x+'px'; bCanvas.style.height=size.y+'px';
+    L.DomUtil.setPosition(bCanvas,map.containerPointToLayerPoint([0,0]));
+    bctx.setTransform(dpr,0,0,dpr,0,0); bctx.clearRect(0,0,size.x,size.y);
+    if(!settings.b3d || map.getZoom()<16 || !bldData) return;
+    const ppm=Math.pow(2,map.getZoom())/(156543.034*Math.cos(map.getCenter().lat*Math.PI/180));   // pixels per meter
+    const cx=size.x/2, cy=size.y/2, CAM=520, dark=document.documentElement.dataset.theme==='dark', list=[];
+    bldData.forEach(w=>{
+      if(!w.geometry || w.geometry.length<4) return;
+      const t=w.tags||{}, hm=parseFloat(t.height) || (parseFloat(t['building:levels'])||0)*3.2 || (6+(w.id%7)*2.5);
+      const pts=w.geometry.map(g=>map.latLngToContainerPoint([g.lat,g.lon]));
+      if(pts.every(q=>q.x<-60||q.x>size.x+60||q.y<-60||q.y>size.y+60)) return;
+      const mx=pts.reduce((a,q)=>a+q.x,0)/pts.length, my=pts.reduce((a,q)=>a+q.y,0)/pts.length;
+      list.push({pts,h:Math.min(hm*ppm*2,CAM*.55),d:Math.hypot(mx-cx,my-cy)});
+    });
+    list.sort((a,b)=>b.d-a.d);   // far blocks first
+    list.forEach(b=>{
+      const k=b.h/(CAM-b.h), roof=b.pts.map(q=>({x:cx+(q.x-cx)*(1+k),y:cy+(q.y-cy)*(1+k)}));
+      for(let i=0;i<b.pts.length-1;i++){
+        const a=b.pts[i], c=b.pts[i+1], ra=roof[i], rc=roof[i+1], shade=Math.sin(Math.atan2(c.y-a.y,c.x-a.x))*.5+.5;
+        bctx.fillStyle=dark?`hsl(200,22%,${22+shade*10}%)`:`hsl(200,14%,${70+shade*12}%)`;
+        bctx.strokeStyle=dark?'rgba(255,255,255,.08)':'rgba(0,0,0,.12)';
+        bctx.beginPath(); bctx.moveTo(a.x,a.y); bctx.lineTo(c.x,c.y); bctx.lineTo(rc.x,rc.y); bctx.lineTo(ra.x,ra.y); bctx.closePath(); bctx.fill(); bctx.stroke();
+      }
+      bctx.fillStyle=dark?'#4A6676':'#EEF2F4'; bctx.strokeStyle=dark?'rgba(255,255,255,.18)':'rgba(0,0,0,.2)';
+      bctx.beginPath(); roof.forEach((q,i)=>i?bctx.lineTo(q.x,q.y):bctx.moveTo(q.x,q.y)); bctx.closePath(); bctx.fill(); bctx.stroke();
+    });
+  });
+}
+map.on('move zoomend resize',drawBuildings);
+map.on('zoomstart',()=>{ bCanvas.style.opacity=0; });
+map.on('zoomend',()=>{ bCanvas.style.opacity=1; });
+
+loadArea(); renderLib(); arm(null);
 </script>
 </body>
 </html>

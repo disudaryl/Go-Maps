@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Go Maps | National Transit Navigator</title>
+<title>Go Maps | Baguio Transit Navigator</title>
 <script>try{var m=localStorage.getItem('byahe-theme')||'system';document.documentElement.dataset.theme=(m==='dark'||(m==='system'&&matchMedia('(prefers-color-scheme: dark)').matches))?'dark':'light'}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -197,6 +197,28 @@ button.traffic[aria-pressed="false"]{opacity:.7}
 @keyframes mepulse{70%{box-shadow:0 0 0 14px rgba(43,127,255,0)}100%{box-shadow:0 0 0 0 rgba(43,127,255,0)}}
 @media (prefers-reduced-motion:reduce){.me{animation:none !important}}
 
+/* Final polish: history buttons, terminals */
+.hits li.rec{display:flex;align-items:center}
+.hits li.rec>button:first-child{flex:1}
+.hits .rm{width:auto;flex:none;padding:9px 12px;color:var(--muted);font-size:1.15rem;line-height:1}
+.hits .clr{color:var(--coral);font-weight:600;font-size:.85rem}
+.hits .empty{color:var(--muted);font-size:.9rem;padding:8px 6px}
+.subrow{display:flex;align-items:center;justify-content:space-between;margin-top:16px}
+.subrow .sub{margin:0}
+.linkbtn{background:none;border:0;color:var(--coral);font-weight:600;cursor:pointer;padding:6px}
+.term.jt{background:#3A7CA5}
+.popbtn{margin-top:6px;border:0;border-radius:8px;padding:6px 10px;background:var(--road);color:var(--on-road);font-weight:600;cursor:pointer}
+
+/* Motorcycle taxi notice */
+.notice{margin:8px 0 10px;padding:12px 14px;border-radius:14px;background:rgba(255,194,14,.16);border:1.5px solid var(--signal);font-size:.9rem}
+.notice h3{margin:0 0 6px;font-size:.98rem}
+.notice ul,#moto-dialog ul{margin:0;padding-left:20px;line-height:1.55}
+#moto-dialog{background:var(--solid);color:var(--ink);border:1px solid var(--mist);border-radius:18px;padding:18px;width:min(92vw,420px)}
+#moto-dialog::backdrop{background:rgba(0,0,0,.5)}
+#moto-dialog h2{margin:0 0 8px;font-family:'Bricolage Grotesque',sans-serif;color:var(--road)}
+.dlg-actions{display:flex;gap:8px;margin-top:12px}
+.dlg-actions button{flex:1;width:auto;margin-top:0}
+
 /* Map pins */
 .pin{width:18px;height:18px;border:3px solid #fff;background:var(--road);border-radius:50%;box-shadow:0 1px 5px rgba(0,0,0,.45)}
 .pin.b{background:var(--coral);border-radius:4px}
@@ -215,7 +237,6 @@ button.traffic[aria-pressed="false"]{opacity:.7}
       <button class="tab" role="tab" data-t="jeep" aria-selected="false">Jeepney</button>
       <button class="tab" role="tab" data-t="bus" aria-selected="false">Bus</button>
       <button class="tab" role="tab" data-t="taxi" aria-selected="false">Taxi</button>
-      <button class="tab" role="tab" data-t="fares" aria-selected="false">Fares</button>
       <button class="tab" role="tab" data-t="lib" aria-selected="false">Library</button>
       <button class="tab" role="tab" data-t="set" aria-selected="false">Settings</button>
     </div>
@@ -247,15 +268,26 @@ button.traffic[aria-pressed="false"]{opacity:.7}
     <div class="pills" id="alts" role="group" aria-label="Route choices" hidden></div>
     <div id="options"></div>
     <ol class="steps" id="steps" hidden></ol>
+        <div class="notice" id="moto-notice" role="note" hidden>
+      <h3>Before you ride a motorcycle taxi</h3>
+      <ul id="moto-tips"></ul>
+    </div>
     <button id="confirm" hidden></button>
     <button id="save-route" class="ghostbtn" type="button" hidden>Save route</button>
 
     </div>
 
     <div class="panel" id="p-jeep" hidden>
-      <p class="hint">Sample Baguio routes. Tap a route to see its stops and when the next jeepney arrives.</p>
-      <div class="pills" id="routes"></div>
-      <ol class="stops" id="stops" hidden></ol>
+      <p class="info" id="jeep-info">Loading jeepney terminals…</p>
+      <button type="button" class="btn" id="jeep-me">Use my location</button>
+      <button type="button" class="ghostbtn" id="jeep-retry" hidden>Retry loading terminals</button>
+      <h2 class="sub">Search for places</h2>
+      <form class="field" id="f-jplace"><input id="q-jplace" placeholder="Search for places" aria-label="Search for places" autocomplete="off"><button class="find">Find</button></form>
+      <ul class="hits" id="hits-jplace"></ul>
+      <div id="jeep-rec"></div>
+      <h2 class="sub">Jeepney terminals near you</h2>
+      <p class="hint">Terminals and loading stations mapped in OpenStreetMap. Informal loading spots may be missing.</p>
+      <ul class="lib" id="jeep-terms"></ul>
     </div>
 
     <div class="panel" id="p-bus" hidden>
@@ -270,22 +302,17 @@ button.traffic[aria-pressed="false"]{opacity:.7}
       <button type="button" class="btn" id="taxi-me">Use my location</button>
     </div>
 
-    <div class="panel" id="p-fares" hidden>
-      <p class="hint">Pick who is riding. Fares on the Trip tab use the discount from this table. Tap a number to change it.</p>
-      <div class="seg2 rider-seg" role="radiogroup" aria-label="Rider type"></div>
-      <div class="tablewrap"><table class="matrix" id="matrix"></table></div>
-      <p class="hint">Starting values are 20% for students, seniors and PWD, the usual legal rate on public transport. Tricycles, ride-hailing and motorcycle taxis can differ by city or operator, so check your source and edit the table.</p>
-    </div>
-
     <div class="panel" id="p-lib" hidden>
       <p class="hint">Pin or search a place on the Trip tab, then tap Set (or Add) to save it here.</p>
+      <button type="button" class="ghostbtn" id="lib-reset">Reset my location and trip</button>
+      <p class="hint">Clears your pins, route and nearby vehicles so you can start from a new location. Saved places and history stay.</p>
       <h2 class="sub">Saved places</h2>
       <ul class="lib" id="lib-places"></ul>
       <div class="addrow"><input id="lib-name" placeholder="Name a new place, e.g. Gym" aria-label="Name for a new place"><button type="button" class="btn" id="lib-add">Add</button></div>
       <p class="info" id="lib-msg"></p>
       <h2 class="sub">Saved routes</h2>
       <ul class="lib" id="lib-routes"></ul>
-      <h2 class="sub">Recents</h2>
+      <div class="subrow"><h2 class="sub">Recents</h2><button type="button" class="linkbtn" id="lib-clear">Clear history</button></div>
       <ul class="lib" id="lib-recents"></ul>
     </div>
 
@@ -297,7 +324,8 @@ button.traffic[aria-pressed="false"]{opacity:.7}
           <button type="button" role="radio" data-m="system" aria-checked="true">System</button>
         </div>
       </div>
-      <label class="row"><span>Show moving jeepneys</span><input type="checkbox" id="s-jeeps" checked></label>
+      <label class="row"><span>Show jeepney terminals</span><input type="checkbox" id="s-jterms" checked></label>
+      <label class="row"><span>Motorcycle taxi safety notice</span><input type="checkbox" id="s-motonote" checked></label>
       <label class="row"><span>Show nearby taxis and jeeps</span><input type="checkbox" id="s-taxis" checked></label>
       <label class="row"><span>Taxi radar range</span><select id="s-radar"><option value="150">150 m</option><option value="300" selected>300 m</option><option value="500">500 m</option></select></label>
       <label class="row"><span>Show bus routes and terminals</span><input type="checkbox" id="s-terms" checked></label>
@@ -317,6 +345,13 @@ button.traffic[aria-pressed="false"]{opacity:.7}
 
   <button class="locate-btn" id="locate" type="button" aria-pressed="false" aria-label="Track my location"><svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="3.2" fill="currentColor"/><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 1v3M10 16v3M1 10h3M16 10h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
 </main>
+
+<dialog id="moto-dialog" aria-labelledby="moto-title">
+  <h2 id="moto-title">Before you ride</h2>
+  <ul id="moto-list"></ul>
+  <label class="row"><span>Don't show this again</span><input type="checkbox" id="moto-skip"></label>
+  <div class="dlg-actions"><button type="button" class="ghostbtn" id="moto-cancel">Go back</button><button type="button" class="btn" id="moto-ok">I understand, book</button></div>
+</dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -360,7 +395,7 @@ function clearRoute(){
   if(routeLayer){ map.removeLayer(routeLayer); routeLayer = null; }
   tripTraffic.clearLayers();
   route = null; selected = null; walk = null; hotBoost = 0; routes = []; $('#alts').hidden = true; $('#alts').dataset.sig = '';
-  $('#options').innerHTML = ''; $('#confirm').hidden = true; $('#save-route').hidden = true; $('#retry').hidden = true; $('#steps').hidden = true;
+  $('#options').innerHTML = ''; $('#confirm').hidden = true; $('#save-route').hidden = true; $('#retry').hidden = true; $('#steps').hidden = true; $('#moto-notice').hidden = true;
 }
 
 /* Search places in the Philippines (Nominatim: free, keep to one search per tap) */
@@ -397,7 +432,8 @@ $('#loc').onclick = () => {
 /* Tap the map: first tap sets pickup, later taps set drop-off */
 map.on('click', e => mapTap(e));
 
-const settings={jeeps:true,taxis:true,terms:true,traffic:'auto',walk:15,sim:4,radar:300,b3d:true,roads:true,source:'sim'};
+const settings={jeeps:true,taxis:true,terms:true,traffic:'auto',walk:15,sim:4,radar:300,b3d:true,roads:true,source:'sim',jterms:true,motonote:true};
+let terminals=[], termKey='', termsLoading=false, placePin=null;
 let ttKey='', liveFactor=null, liveInfo='', routeBusy=false, routes=[], routeIdx=0, rider='regular', quietRoute=false;
 // Routing servers, tried in order. The second one is a backup in case the first is busy.
 const OSRM={driving:['https://router.project-osrm.org/route/v1/driving/','https://routing.openstreetmap.de/routed-car/route/v1/driving/'],foot:['https://routing.openstreetmap.de/routed-foot/route/v1/foot/']};
@@ -495,7 +531,11 @@ function matchBus(){   // intercity bus whose terminals are both within 3 km of 
   return best;
 }
 async function transitPlan(kind){
-  const t=kind==='jeep' ? matchRoute() : matchBus();
+  if(kind==='jeep'){   // walk to the nearest real terminal, then ride the road
+    const jt=nearestTerminal(pts.pickup,1500);
+    return jt ? {jeep:true,term:jt,w1:await footLeg(pts.pickup,jt)} : null;
+  }
+  const t=matchBus();
   if(!t) return null;
   const A={lat:t.a.s[1],lng:t.a.s[2]}, B={lat:t.b.s[1],lng:t.b.s[2]};
   const [w1,w2]=await Promise.all([footLeg(pts.pickup,A),footLeg(B,pts.drop)]);
@@ -514,9 +554,11 @@ async function draw(kind,fit){
     plan=await transitPlan(kind);
     if(token!==drawToken) return;
     if(plan){
-      lane(plan.w1.pts,'#5B6B72',4,'2 9'); lane(plan.w2.pts,'#5B6B72',4,'2 9');
-      lane(plan.ride,plan.t.r.color,7);
-      L.polyline(plan.ride,{color:'#fff',weight:2,opacity:.9,dashArray:'1 14',className:'flow',interactive:false}).addTo(g);   // shows the direction of travel
+      lane(plan.w1.pts,'#5B6B72',4,'2 9');
+      const ride=plan.jeep ? route.geo.coordinates.map(c=>[c[1],c[0]]) : plan.ride;
+      if(!plan.jeep) lane(plan.w2.pts,'#5B6B72',4,'2 9');
+      lane(ride,plan.jeep?'#3A7CA5':plan.t.r.color,7);
+      L.polyline(ride,{color:'#fff',weight:2,opacity:.9,dashArray:'1 14',className:'flow',interactive:false}).addTo(g);   // shows the direction of travel
     }
   }
   if(!plan && kind!=='walk' && routes.length>1) routes.forEach((r,i)=>{   // other route choices: grey, tap to switch
@@ -535,14 +577,20 @@ function showSteps(kind,plan){   // step-by-step list under the options
   if(!selected) return;
   const add=t=>{ const li=document.createElement('li'); li.textContent=t; ol.append(li); };
   if(kind==='walk') add(`Walk ${fmtDist(walk.km)}, about ${Math.round(walk.km*settings.walk)} min. Hilly streets can take longer.`);
+  else if(plan && plan.jeep){
+    add(`Walk ${fmtDist(plan.w1.km)} to ${plan.term.name}.`);
+    add('Ask the barker or driver for a jeepney going toward your destination.');
+    add(`Ride about ${fmtDist(route.km)}. The fare is an estimate from road distance.`);
+  }
   else if(plan){
     const {t,w1,w2}=plan, n=Math.abs(t.r.stops.indexOf(t.a.s)-t.r.stops.indexOf(t.b.s));
     add(`Walk ${fmtDist(w1.km)} to ${t.a.s[0]}.`);
-    add(kind==='jeep' ? `Board ${t.r.name} (next jeepney ${nextEta(t.r,t.a.s)}).` : `Board the ${t.r.name} bus.`);
+    add(`Board the ${t.r.name} bus.`);
     add(`Ride ${n} stop${n>1?'s':''}, then get off at ${t.b.s[0]}.`);
     add(`Walk ${fmtDist(w2.km)} to your destination.`);
   }
-  else if(kind==='jeep' || kind==='bus') add(`No ${kind==='jeep'?'jeepney':'bus'} route is near both places, so the road route is shown instead.`);
+  else if(kind==='jeep') add('No jeepney terminal within 1.5 km of your pickup, so the road route is shown instead.');
+  else if(kind==='bus') add('No bus terminal is near both places, so the road route is shown instead.');
   else add(`Ride ${fmtDist(route.km)} by road. ${trafficWord()}`);
   ol.hidden=!ol.children.length;
 }
@@ -552,7 +600,7 @@ function quote(key,m){
   const walking=key==='walk';
   const mins=walking ? walk.km*settings.walk : route.min*trafficMult(key)*m.slow;
   const full=walking ? 0 : Math.round(m.base+Math.max(0,route.km-(m.freeKm||0))*m.perKm+(m.perMin||0)*mins);
-  const pct=(DISC[key]||{})[rider]||0, fare=Math.round(full*(1-pct/100));   // student, senior or PWD discount
+  const pct=discPct(key), fare=Math.round(full*(1-pct/100));   // student, senior or PWD discount
   return {fare, full, pct, eta:Math.round(mins+(key==='taxi'?taxiWait():(m.wait||0))), km:walking?walk.km:route.km};
 }
 
@@ -564,11 +612,12 @@ function renderOptions(){
     if(m.maxKm && route.km>m.maxKm) return;
     const q=quote(key,m), walking=key==='walk', on=!!selected && selected.key===key, b=document.createElement('button');
     const arrive=clock(new Date(Date.now()+q.eta*60000));
-    const t=key==='jeep' ? matchRoute() : key==='bus' ? matchBus() : null; let note=(m.note||'').toLowerCase();
-    if(key==='jeep') note=t ? `take ${t.r.name} from ${t.a.s[0]} to ${t.b.s[0]}, walk ${fmtDist((t.a.w+t.b.w)/1000)} in total, next jeepney ${nextEta(t.r,t.a.s)}` : 'no route nearby, estimate from road distance';
+    const t=key==='bus' ? matchBus() : null; let note=(m.note||'').toLowerCase();
+    if(key==='moto' && settings.motonote) note='tap to read the safety notice';
+    if(key==='jeep'){ const jt=nearestTerminal(pts.pickup,1500); note=jt ? `walk to ${jt.name} (${fmtDist(jt.d/1000)}), ask for a jeepney toward your destination, estimate from road distance` : 'no jeepney terminal within 1.5 km, estimate from road distance'; }
     if(key==='bus') note=t ? `take ${t.r.name} from ${t.a.s[0]} to ${t.b.s[0]}` : 'no terminal near both places, estimate from road distance';
     b.className='opt'; b.setAttribute('aria-pressed',String(on)); b.style.setProperty('--c',t?t.r.color:m.color);
-    b.innerHTML=`<span class="ico" aria-hidden="true">${m.ico}</span><span class="name">${m.label}${key===bestFast?'<em class="tag">Fastest</em>':''}${key===bestCheap?'<em class="tag">Cheapest</em>':''}</span><span class="fare">${walking?fmtDist(q.km):'₱'+q.fare}</span><span class="sub">About ${q.eta} min, arrive ${arrive}${note?', '+note:''}${q.pct?`, ${q.pct}% ${RLABEL[rider]} discount, was ₱${q.full}`:''}</span>`;
+    b.innerHTML=`<span class="ico" aria-hidden="true">${m.ico}</span><span class="name">${m.label}${key===bestFast?'<em class="tag">Fastest</em>':''}${key===bestCheap?'<em class="tag">Cheapest</em>':''}</span><span class="fare">${walking?fmtDist(q.km):'₱'+q.fare}</span><span class="sub">About ${q.eta} min, arrive ${arrive}${note?', '+note:''}${q.pct?`, ${q.pct}% ${RLABEL[rider]} discount (LTFRB), was ₱${q.full}`:''}</span>`;
     b.onclick=()=>{ selected={key}; renderOptions(); draw(key,true); $('.opt[aria-pressed="true"]').focus(); };
     box.append(b);
     if(on) chosen={key,m,q};
@@ -576,11 +625,13 @@ function renderOptions(){
   const c=$('#confirm');
   c.hidden=!chosen || chosen.key==='walk';
   if(chosen) c.textContent=`Book ${chosen.m.label} for ₱${chosen.q.fare}`;
+  $('#moto-notice').hidden=!(chosen && chosen.key==='moto' && settings.motonote);
 }
 
 $('#confirm').onclick=()=>{
   if(!selected) return;
-  say(`${FARES[selected.key].label} requested (demo). Driver matching comes in the next step.`);
+  if(selected.key==='moto' && settings.motonote) return openMotoNotice();
+  bookRide();
 };
 
 /* ---- Quick picks and the live loop ---- */
@@ -598,63 +649,6 @@ function tick(){
 updateTraffic();
 setInterval(tick,8000);
 
-/* ---- Simulated Baguio jeepney routes (sample data, stop positions are approximate) ---- */
-// Each route: name, color, ordered stops [name, lat, lng]. Add or edit routes here.
-const JEEPS=[
-  {id:'mv',name:'Mines View – Session',color:'#1D7AFC',stops:[['Mines View Park',16.4195,120.6275],['Wright Park',16.4172,120.6110],['Upper Session Road',16.4135,120.5985],['Session Road',16.4122,120.5962],['Public Market',16.4158,120.5937]]},
-  {id:'jh',name:'Camp John Hay – Burnham',color:'#8E44AD',stops:[['Camp John Hay',16.3996,120.6128],['Pacdal Circle',16.4025,120.6075],['SM City Baguio',16.4088,120.5978],['Burnham Park',16.4113,120.5935],['Public Market',16.4158,120.5937]]},
-  {id:'ir',name:'Irisan – Public Market',color:'#00A3A3',stops:[['Irisan Terminal',16.4140,120.5640],['Dominican Hill',16.4165,120.5835],['Aurora Hill',16.4170,120.5900],['Public Market',16.4158,120.5937]]},
-  {id:'tr',name:'Trancoville – Session',color:'#D6336C',stops:[['Trancoville',16.4290,120.5940],['Magsaysay Avenue',16.4185,120.5940],['Public Market',16.4158,120.5937],['Session Road',16.4122,120.5962]]}
-];
-const jeepGroups={}; let focusId=null;
-
-JEEPS.forEach(async r=>{
-  const g=L.layerGroup().addTo(map); jeepGroups[r.id]=g;
-  let latlngs=r.stops.map(s=>[s[1],s[2]]);   // fallback: straight lines between stops
-  try{   // follow the real roads between the stops
-    const d=await osrm('driving',r.stops.map(s=>s[2]+','+s[1]).join(';'));
-    if(d && d.code==='Ok') latlngs=d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
-  }catch(e){}
-  L.polyline(latlngs,{color:r.color,weight:5,opacity:.85,lineCap:'round'}).addTo(g).bringToBack();
-  buildPath(r,latlngs); spawnJeeps(r);
-  r.stops.forEach(s=>L.circleMarker([s[1],s[2]],{radius:6,color:'#fff',weight:2,fillColor:r.color,fillOpacity:1}).bindPopup(`<b>${s[0]}</b><br>${r.name}`).addTo(g));
-});
-
-JEEPS.forEach(r=>{
-  const b=document.createElement('button');
-  b.type='button'; b.className='rt'; b.setAttribute('aria-pressed','false'); b.style.setProperty('--c',r.color);
-  b.innerHTML=`<i></i>${r.name}`;
-  b.onclick=()=>focusRoute(focusId===r.id ? null : r.id);
-  r.btn=b; $('#routes').append(b);
-});
-
-function focusRoute(id){   // show one route and its stop list, or all routes again
-  focusId=id;
-  JEEPS.forEach(r=>{
-    r.btn.setAttribute('aria-pressed',String(r.id===id));
-    const g=jeepGroups[r.id], show=!id || r.id===id;
-    if(show && !map.hasLayer(g)) g.addTo(map);
-    if(!show && map.hasLayer(g)) map.removeLayer(g);
-  });
-  const list=$('#stops'); list.hidden=!id;
-  if(!id) return;
-  const r=JEEPS.find(x=>x.id===id), mobile=matchMedia('(max-width:767px)').matches;
-  list.style.setProperty('--c',r.color);
-  list.innerHTML=r.stops.map(s=>`<li>${s[0]}</li>`).join('');
-  map.fitBounds(L.latLngBounds(r.stops.map(s=>[s[1],s[2]])),pad());
-}
-
-/* Nearest route whose stops are both within 700 m of pickup and drop-off (straight-line distance) */
-function matchRoute(){
-  let best=null;
-  JEEPS.forEach(r=>{
-    const near=p=>r.stops.map(s=>({s,w:map.distance([s[1],s[2]],[p.lat,p.lng])})).sort((x,y)=>x.w-y.w)[0];
-    const a=near(pts.pickup), b=near(pts.drop);
-    if(a.w<700 && b.w<700 && a.s!==b.s && (!best || a.w+b.w<best.a.w+best.b.w)) best={r,a,b};
-  });
-  return best;
-}
-
 /* ---- Menu tabs ---- */
 const TABBTNS=[...document.querySelectorAll('.tab')];
 function showTab(id){
@@ -668,11 +662,10 @@ const pad=()=>{   // keep the route clear of the panel, unless the panel is hidd
 };
 const offset=(p,north,east)=>L.latLng(p.lat+north/111320, p.lng+east/(111320*Math.cos(p.lat*Math.PI/180)));
 const vehIcon=(txt,bg,fg='#fff')=>L.divIcon({className:'',html:`<div class="veh" style="background:${bg};color:${fg}">${txt}</div>`,iconSize:[22,22],iconAnchor:[11,11]});
-const jeepGroup=L.layerGroup().addTo(map), taxiGroup=L.layerGroup().addTo(map), busGroup=L.layerGroup().addTo(map);
+const taxiGroup=L.layerGroup().addTo(map), busGroup=L.layerGroup().addTo(map);
 const mpm=()=>250*(1-.5*traffic);   // real jeepney speed in meters per minute (about 15 km/h, slower in traffic)
 
-/* ---- Simulated jeepneys: 3 per route, moving back and forth along the road ---- */
-let jeeps=[];
+/* ---- Route geometry helpers ---- */
 function buildPath(r,latlngs){
   r.path=latlngs.map(p=>L.latLng(p)); r.cum=[0];
   for(let i=1;i<r.path.length;i++) r.cum.push(r.cum[i-1]+map.distance(r.path[i-1],r.path[i]));
@@ -684,31 +677,6 @@ function pointAt(r,d){
   const f=(d-r.cum[i-1])/((r.cum[i]-r.cum[i-1])||1), a=r.path[i-1], b=r.path[i];
   return L.latLng(a.lat+(b.lat-a.lat)*f, a.lng+(b.lng-a.lng)*f);
 }
-function spawnJeeps(r){
-  for(let i=0;i<3;i++){
-    const v={r,d:r.len*(i+.5)/3,dir:i%2?-1:1};
-    v.mk=L.marker(pointAt(r,v.d),{icon:vehIcon('J',r.color),keyboard:false,interactive:false}).addTo(jeepGroup);
-    jeeps.push(v);
-  }
-}
-function stepJeeps(dt){
-  jeeps.forEach(v=>{
-    v.d+=v.dir*mpm()/60*dt*settings.sim;
-    if(v.d>v.r.len){v.d=v.r.len;v.dir=-1;}
-    if(v.d<0){v.d=0;v.dir=1;}
-    v.mk.setLatLng(pointAt(v.r,v.d)); v.mk.setOpacity(!focusId||v.r.id===focusId?1:0);
-  });
-}
-function nextEta(r,s){   // minutes until the nearest jeepney of this route reaches the stop
-  let best=Infinity;
-  jeeps.filter(v=>v.r===r).forEach(v=>{
-    let d=v.dir>0 ? s.d-v.d : v.d-s.d;
-    if(d<0) d=v.dir>0 ? (r.len-v.d)+(r.len-s.d) : v.d+s.d;
-    best=Math.min(best,d);
-  });
-  return best===Infinity ? 'soon' : 'in '+Math.max(1,Math.round(best/mpm()))+' min';
-}
-
 /* ---- Taxi radar: a circle around the pickup. Taxis drive in along real roads, cross it and fade out ---- */
 let taxis=[], taxiC=null, ring=null, radarToken=0;
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -799,7 +767,7 @@ function focusBus(id){
   const r=BUSES.find(x=>x.id===id);
   const h=r.min/60, b=FARES.bus;
   $('#bus-info').textContent = r.km
-    ? `${r.name}: about ${Math.round(r.km)} km by road, ${Math.floor(h)} h ${Math.round((h%1)*60)} min. Sample fare ₱${Math.round((b.base+Math.max(0,r.km-b.freeKm)*b.perKm)*(1-((DISC.bus||{})[rider]||0)/100))}${rider!=='regular'?` (${RLABEL[rider]} rate)`:''}.`
+    ? `${r.name}: about ${Math.round(r.km)} km by road, ${Math.floor(h)} h ${Math.round((h%1)*60)} min. Sample fare ₱${Math.round((b.base+Math.max(0,r.km-b.freeKm)*b.perKm)*(1-discPct('bus')/100))}${rider!=='regular'?` (${RLABEL[rider]} rate)`:''}.`
     : `${r.name}: road distance is not available yet. Try again in a moment.`;
   map.fitBounds(r.line ? r.line.getBounds() : L.latLngBounds(r.stops.map(s=>[s[1],s[2]])), pad());
 }
@@ -807,7 +775,7 @@ function focusBus(id){
 /* ---- Settings ---- */
 const bind=(sel,fn)=>$(sel).addEventListener('change',e=>fn(e.target));
 const toggle=(g,on)=>map[on?'addLayer':'removeLayer'](g);
-bind('#s-jeeps',el=>{settings.jeeps=el.checked; toggle(jeepGroup,el.checked);});
+bind('#s-jterms',el=>{settings.jterms=el.checked; toggle(termGroup,el.checked);});
 bind('#s-taxis',el=>{settings.taxis=el.checked; toggle(taxiGroup,el.checked);});
 bind('#s-radar',el=>{settings.radar=+el.value; if(taxiC) spawnTaxis(taxiC);});
 bind('#s-b3d',el=>{settings.b3d=el.checked; if(el.checked) loadArea(); drawBuildings();});
@@ -822,15 +790,12 @@ function refreshInfo(){
   $('#taxi-info').textContent = settings.taxis
     ? (taxiC ? `${taxis.filter(t=>t.kind==='taxi'&&t.vis).length} taxis and ${taxis.filter(t=>t.kind==='jeep'&&t.vis).length} jeeps inside the ${settings.radar} m radar. The nearest taxi is about ${taxiWait()} min away.` : 'Set a pickup, or tap Use my location, to see taxis around you.')
     : 'Nearby taxis are switched off in Settings.';
-  if(focusId){
-    const r=JEEPS.find(x=>x.id===focusId);
-    [...$('#stops').children].forEach((li,i)=>{ li.textContent=`${r.stops[i][0]}, next jeepney ${nextEta(r,r.stops[i])}`; });
-  }
+  renderTerminals();
 }
 let last=Date.now(), n=0;
 setInterval(()=>{
   const now=Date.now(), dt=(now-last)/1000; last=now;
-  stepJeeps(dt); moveTaxis(dt);
+  moveTaxis(dt);
   if(++n%4===0) refreshInfo();
 },700);
 refreshInfo();
@@ -914,7 +879,7 @@ function assign(key){
 function renderLib(){
   const P=$('#lib-places'), R=$('#lib-routes'), C=$('#lib-recents'); P.innerHTML=R.innerHTML=C.innerHTML='';
   [['home','Home'],['work','Work']].forEach(([key,name])=>{
-    const v=lib[key]; P.append(row(name, v?v.label:'Not set', [...(v?[['Use',()=>useFor(v,name)]]:[]),['Set',()=>assign(key)]]));
+    const v=lib[key]; P.append(row(name, v?v.label:'Not set', [...(v?[['Use',()=>useFor(v,name)]]:[]),['Set',()=>assign(key)],...(v?[['Clear',()=>{ lib[key]=null; store(); }]]:[])]));
   });
   lib.custom.forEach((v,i)=>P.append(row(v.name,v.label,[['Use',()=>useFor(v,v.name)],['Remove',()=>{ lib.custom.splice(i,1); store(); }]])));
   lib.routes.forEach((v,i)=>R.append(row(v.name,'',[['Go',()=>{ setPoint('pickup',v.from,v.from.label); setPoint('drop',v.to,v.to.label); showTab('trip'); }],['Remove',()=>{ lib.routes.splice(i,1); store(); }]])));
@@ -936,13 +901,25 @@ $('#save-route').onclick=()=>{
 /* Typing or focusing a field suggests saved places and recents (online search runs on Find) */
 function suggest(k){
   const q=$('#q-'+k).value.trim().toLowerCase(), ul=$('#hits-'+k);
-  const saved=[['Home',lib.home],['Work',lib.work],...lib.custom.map(c=>[c.name,c])].filter(([n,v])=>v && n.toLowerCase().includes(q)).map(([n,v])=>['★ '+n,v,n]);
-  const rec=lib.recents.filter(r=>r.label.toLowerCase().includes(q)).slice(0,4).map(r=>['↺ '+r.label,r,r.label]);
+  const saved=[['Home',lib.home],['Work',lib.work],...lib.custom.map(c=>[c.name,c])].filter(([n,v])=>v && n.toLowerCase().includes(q));
+  const rec=lib.recents.filter(r=>r.label.toLowerCase().includes(q)).slice(0,5);
   ul.innerHTML='';
-  [...saved,...rec].slice(0,6).forEach(([txt,v,label])=>{
+  const item=(txt,v,label,onRemove)=>{
     const li=document.createElement('li'), b=document.createElement('button');
-    b.type='button'; b.textContent=txt; b.onclick=()=>setPoint(k,{lat:v.lat,lng:v.lng},label); li.append(b); ul.append(li);
-  });
+    li.className='rec'; b.type='button'; b.textContent=txt; b.onclick=()=>setPoint(k,{lat:v.lat,lng:v.lng},label); li.append(b);
+    if(onRemove){
+      const x=document.createElement('button'); x.type='button'; x.className='rm'; x.textContent='×'; x.setAttribute('aria-label',`Remove ${label} from history`);
+      x.onclick=e=>{ e.stopPropagation(); onRemove(); suggest(k); }; li.append(x);
+    }
+    ul.append(li);
+  };
+  saved.forEach(([n,v])=>item('★ '+n,v,n));
+  rec.forEach(r=>item('↺ '+r.label,r,r.label,()=>{ lib.recents=lib.recents.filter(x=>x!==r); store(); }));
+  if(rec.length){
+    const li=document.createElement('li'), c=document.createElement('button');
+    c.type='button'; c.className='clr'; c.textContent='Clear all history'; c.onclick=()=>{ lib.recents=[]; store(); suggest(k); };
+    li.append(c); ul.append(li);
+  }
 }
 ['pickup','drop'].forEach(k=>{ const inp=$('#q-'+k); inp.addEventListener('input',()=>suggest(k)); inp.addEventListener('focus',()=>{ arm(k); suggest(k); }); });
 
@@ -1110,7 +1087,7 @@ function syncTraffic(){   // apply the traffic switch, data source and key to th
   if(sim){ loadArea(); drawTraffic(); }
   liveFactor=null; liveInfo='';
   updateTraffic(); tick(); fetchLive();
-  try{ localStorage.setItem('byahe-prefs',JSON.stringify({roads:settings.roads,source:settings.source})); }catch(e){}
+  savePrefs();
 }
 $('#traffic-pill').onclick=()=>$('#s-roads').click();
 bind('#s-source',el=>{
@@ -1124,55 +1101,23 @@ $('#s-keysave').onclick=()=>{
   $('#key-msg').textContent = ttKey ? 'Key saved in this browser.' : 'Key cleared.';
   syncTraffic();
 };
-try{
-  const pr=JSON.parse(localStorage.getItem('byahe-prefs')||'{}');
-  if(typeof pr.roads==='boolean') settings.roads=pr.roads;
-  if(pr.source) settings.source=pr.source;
-  ttKey=localStorage.getItem('byahe-tomtom')||'';
-}catch(e){}
-$('#s-roads').checked=settings.roads; $('#s-source').value=settings.source; $('#keyrow').hidden=settings.source!=='live'; $('#s-key').value=ttKey;
-syncTraffic();
-
-/* ---- Fare discounts: one matrix for every ride and rider type ---- */
+/* ---- Fare discounts: fixed 20% LTFRB rate for students, seniors and PWD ---- */
 const RLABEL={regular:'Regular',student:'Student',senior:'Senior',pwd:'PWD'};
 const RIDERS=Object.keys(RLABEL);
-// Percent off the fare. 20% is a placeholder for the usual legal rate on public transport.
-// Tricycles, ride-hailing and motorcycle taxis can differ by city or operator, so edit these or the Fares tab.
-const DISC=Object.fromEntries(Object.keys(FARES).map(k=>[k,{student:20,senior:20,pwd:20}]));
-const saveFares=()=>{ try{ localStorage.setItem('byahe-fares',JSON.stringify({rider,disc:DISC})); }catch(e){} };
-try{
-  const f=JSON.parse(localStorage.getItem('byahe-fares')||'{}');
-  if(f.rider && RLABEL[f.rider]) rider=f.rider;
-  if(f.disc) Object.keys(DISC).forEach(k=>{ if(f.disc[k]) Object.assign(DISC[k],f.disc[k]); });
-}catch(e){}
+const LTFRB_RATE=20;   // percent, set by law, so it is not adjustable here
+const LTFRB_MODES=['jeep','bus','taxi','car'];   // LTFRB-regulated rides. Tricycles are set by each city, so no fixed discount is applied
+const discPct=key=>rider!=='regular' && LTFRB_MODES.includes(key) ? LTFRB_RATE : 0;
 function renderRiders(){
   document.querySelectorAll('.rider-seg').forEach(box=>{
     box.innerHTML='';
     RIDERS.forEach(k=>{
       const b=document.createElement('button'); b.type='button'; b.setAttribute('role','radio'); b.setAttribute('aria-checked',String(k===rider)); b.textContent=RLABEL[k];
-      b.onclick=()=>{ rider=k; saveFares(); renderRiders(); renderMatrix(); if(route) renderOptions(); };
+      b.onclick=()=>{ rider=k; savePrefs(); renderRiders(); if(route) renderOptions(); };
       box.append(b);
     });
   });
 }
-function renderMatrix(){
-  const t=$('#matrix'); t.innerHTML='';
-  const hr=t.createTHead().insertRow();
-  ['Ride',...RIDERS.map(k=>RLABEL[k])].forEach((h,i)=>{ const th=document.createElement('th'); th.textContent=h; if(i && RIDERS[i-1]===rider) th.className='on'; hr.append(th); });
-  const body=t.createTBody();
-  [...Object.entries(FARES),['walk',WALK]].forEach(([key,m])=>{
-    const tr=body.insertRow(); tr.insertCell().textContent=`${m.ico} ${m.label}`;
-    if(key==='walk'){ const c=tr.insertCell(); c.colSpan=4; c.textContent='Free'; return; }
-    const c0=tr.insertCell(); c0.textContent='0%'; if(rider==='regular') c0.className='on';
-    ['student','senior','pwd'].forEach(r=>{
-      const c=tr.insertCell(), inp=document.createElement('input');
-      inp.type='number'; inp.min=0; inp.max=100; inp.value=DISC[key][r]; inp.setAttribute('aria-label',`${m.label}, ${RLABEL[r]} discount percent`);
-      inp.onchange=()=>{ DISC[key][r]=clamp(+inp.value||0,0,100); inp.value=DISC[key][r]; saveFares(); if(route) renderOptions(); };
-      c.append(inp); if(r===rider) c.className='on';
-    });
-  });
-}
-renderRiders(); renderMatrix();
+renderRiders();
 
 /* ---- Recommended routes: Fastest / Cheapest tags and road alternatives ---- */
 let bestFast=null, bestCheap=null;
@@ -1257,6 +1202,154 @@ locBtn.onclick=()=>{
   else stopTracking();
 };
 map.on('dragstart',()=>{ if(watchId!==null && follow){ follow=false; locState(); } });   // dragging the map pauses following
+
+/* ---- Jeepney terminals: real places from OpenStreetMap, nothing made up ---- */
+const termGroup=L.layerGroup().addTo(map), recGroup=L.layerGroup().addTo(map);
+const refPoint=()=>pts.pickup ? L.latLng(pts.pickup.lat,pts.pickup.lng) : meMarker ? meMarker.getLatLng() : map.getCenter();
+const nearTerminals=(p,n)=>terminals.map(t=>({...t,d:map.distance([t.lat,t.lng],[p.lat,p.lng])})).sort((a,b)=>a.d-b.d).slice(0,n);
+const nearestTerminal=(p,max)=>{ const t=nearTerminals(p,1)[0]; return t && t.d<=max ? t : null; };
+async function loadTerminals(force){
+  if(termsLoading) return;
+  try{
+    const c=JSON.parse(localStorage.getItem('byahe-terminals')||'null');
+    if(c && !force && Date.now()-c.t<6048e5 && c.data.length){ terminals=c.data; drawTerminals(); return; }   // cached for a week
+  }catch(e){}
+  termsLoading=true; $('#jeep-info').textContent='Loading jeepney terminals from OpenStreetMap…';
+  try{
+    const b='16.33,120.52,16.48,120.66';
+    const els=await overpass(`[out:json][timeout:25];(nwr["amenity"="bus_station"](${b});nwr["public_transport"="station"](${b});nwr["name"~"jeep",i](${b});nwr["name"~"terminal",i]["amenity"!="parking"](${b}););out center 300;`);
+    const all=els.map(e=>({name:(e.tags&&(e.tags.name||e.tags['name:en']))||'',lat:e.lat!==undefined?e.lat:(e.center&&e.center.lat),lng:e.lon!==undefined?e.lon:(e.center&&e.center.lon)})).filter(t=>t.name && t.lat!==undefined);
+    terminals=all.filter((t,i)=>all.findIndex(u=>u.name===t.name && map.distance([u.lat,u.lng],[t.lat,t.lng])<150)===i);   // drop duplicates
+    if(terminals.length){ try{ localStorage.setItem('byahe-terminals',JSON.stringify({t:Date.now(),data:terminals})); }catch(e){} }
+    else $('#jeep-info').textContent='OpenStreetMap has no mapped terminals here yet.';
+    drawTerminals();
+  }catch(e){ $('#jeep-info').textContent='Could not load jeepney terminals. Check your connection.'; $('#jeep-retry').hidden=false; }
+  finally{ termsLoading=false; }
+}
+function drawTerminals(){
+  termGroup.clearLayers();
+  terminals.forEach(t=>{
+    const tip=document.createElement('div'), nm=document.createElement('b'), btn=document.createElement('button');
+    nm.textContent=t.name; btn.type='button'; btn.className='popbtn'; btn.textContent='Set as destination';
+    btn.onclick=()=>{ setPoint('drop',{lat:t.lat,lng:t.lng},t.name); map.closePopup(); showTab('trip'); };
+    tip.append(nm,document.createElement('br'),btn);
+    t.mk=L.marker([t.lat,t.lng],{icon:L.divIcon({className:'',html:'<div class="term jt">🚐</div>',iconSize:[26,26],iconAnchor:[13,13]})}).bindPopup(tip).addTo(termGroup);
+  });
+  termKey=''; renderTerminals();
+}
+function renderTerminals(){   // list sorted by distance from you (or your pickup, or the city center)
+  const ul=$('#jeep-terms');
+  if(!terminals.length){ ul.innerHTML='<li class="empty">No terminals loaded yet.</li>'; return; }
+  const ref=refPoint(), key=terminals.length+':'+ref.lat.toFixed(4)+','+ref.lng.toFixed(4);
+  if(key===termKey) return; termKey=key; ul.innerHTML='';
+  const near=nearTerminals(ref,12), who=pts.pickup ? 'your pickup' : meMarker ? 'you' : 'the city center';
+  near.forEach(t=>ul.append(row(t.name,`${fmtDist(t.d/1000)} from ${who}`,[
+    ['Show',()=>{ map.flyTo([t.lat,t.lng],17); t.mk.openPopup(); }],
+    ['Go',()=>{ setPoint('drop',{lat:t.lat,lng:t.lng},t.name); showTab('trip'); }]])));
+  const within=near.filter(t=>t.d<=1000).length;
+  $('#jeep-info').textContent=`${within} terminal${within===1?'':'s'} within 1 km of ${who}. Nearest: ${near[0].name}, ${fmtDist(near[0].d/1000)} away.`;
+}
+$('#jeep-me').onclick=()=>$('#loc').click();
+$('#jeep-retry').onclick=()=>{ $('#jeep-retry').hidden=true; loadTerminals(true); };
+
+/* Search for places: recommends the terminals to board near you and the ones closest to the place */
+async function placeSearch(){
+  const q=$('#q-jplace').value.trim(), ul=$('#hits-jplace');
+  if(!q) return;
+  ul.innerHTML='<li class="empty">Searching…</li>';
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&accept-language=en&viewbox=120.52,16.48,120.66,16.33&bounded=1&q='+encodeURIComponent(q));
+    const list=await r.json(); ul.innerHTML='';
+    if(!list.length){ ul.innerHTML='<li class="empty">No places found in Baguio. Try another name.</li>'; return; }
+    list.forEach(p=>{
+      const li=document.createElement('li'), b=document.createElement('button');
+      b.type='button'; b.textContent=p.display_name;
+      b.onclick=()=>recommend({lat:+p.lat,lng:+p.lon,name:p.display_name.split(',').slice(0,2).join(',')});
+      li.append(b); ul.append(li);
+    });
+  }catch(e){ ul.innerHTML='<li class="empty">Search failed. Check your internet connection.</li>'; }
+}
+$('#f-jplace').addEventListener('submit',e=>{ e.preventDefault(); placeSearch(); });
+function recommend(pl){
+  $('#hits-jplace').innerHTML=''; $('#q-jplace').value=pl.name;
+  if(placePin) map.removeLayer(placePin);
+  placePin=L.marker([pl.lat,pl.lng],{icon:pinIcon('drop'),keyboard:false}).addTo(map);
+  const box=$('#jeep-rec'); box.innerHTML=''; recGroup.clearLayers();
+  if(!terminals.length){ box.textContent='Jeepney terminals have not loaded yet. Try again in a moment.'; return; }
+  const toPlace=nearTerminals(pl,3), fromMe=nearTerminals(refPoint(),2);
+  const say2=t=>{ const p=document.createElement('p'); p.className='info'; p.textContent=t; box.append(p); };
+  const list=(arr,suffix)=>{ const ol=document.createElement('ol'); ol.className='steps'; arr.forEach(t=>{ const li=document.createElement('li'); li.textContent=`${t.name}, ${fmtDist(t.d/1000)} ${suffix}`; ol.append(li); }); box.append(ol); };
+  say2(`To get to ${pl.name}:`);
+  say2(pts.pickup||meMarker ? 'Board at one of these terminals near you:' : 'Set My Location to get terminals near you. Nearest to the city center:');
+  list(fromMe,'from you');
+  say2('The terminals closest to the place. Ask for a jeepney heading to this area:');
+  list(toPlace,'from the place');
+  say2('Open map data has no jeepney route codes, so ask the barker or driver which jeepney goes there.');
+  const go=document.createElement('button'); go.type='button'; go.className='btn'; go.textContent='Use as my destination';
+  go.onclick=()=>{ setPoint('drop',{lat:pl.lat,lng:pl.lng},pl.name); showTab('trip'); }; box.append(go);
+  [...toPlace,...fromMe].forEach(t=>L.circleMarker([t.lat,t.lng],{radius:16,color:'#FFC20E',weight:3,fill:false,interactive:false}).addTo(recGroup));
+  map.fitBounds(L.latLngBounds([[pl.lat,pl.lng],...toPlace.map(t=>[t.lat,t.lng]),...fromMe.map(t=>[t.lat,t.lng])]),pad());
+}
+
+/* ---- Library: reset and clear history ---- */
+function resetLocations(){
+  stopTracking(); clearRoute();
+  ['pickup','drop'].forEach(k=>{ pts[k]=null; if(markers[k]){ map.removeLayer(markers[k]); delete markers[k]; } $('#q-'+k).value=''; $('#hits-'+k).innerHTML=''; });
+  taxiGroup.clearLayers(); taxis=[]; taxiC=null; ring=null; radarToken++;
+  if(placePin){ map.removeLayer(placePin); placePin=null; }
+  recGroup.clearLayers(); $('#jeep-rec').innerHTML=''; $('#q-jplace').value='';
+  lastPoint=null; termKey=''; arm(null);
+  say('Locations reset. Choose a new My Location and Destination/Stop.');
+  showTab('trip'); setPanel(true); map.setView([16.4023,120.5960],14); refreshInfo();
+}
+$('#lib-reset').onclick=resetLocations;
+$('#lib-clear').onclick=()=>{ lib.recents=[]; store(); };
+
+/* ---- Remember every setting between visits (3D buildings, traffic, theme, rider type and more) ---- */
+const PREF_CONTROLS={'#s-taxis':'taxis','#s-radar':'radar','#s-jterms':'jterms','#s-terms':'terms','#s-b3d':'b3d','#s-roads':'roads','#s-source':'source','#s-traffic':'traffic','#s-walk':'walk','#s-sim':'sim','#s-motonote':'motonote'};
+function savePrefs(){
+  const o={rider}; Object.values(PREF_CONTROLS).forEach(k=>{ o[k]=settings[k]; });
+  try{ localStorage.setItem('byahe-prefs',JSON.stringify(o)); }catch(e){}
+}
+$('#p-set').addEventListener('change',savePrefs);
+function loadPrefs(){
+  let pr={};
+  try{ pr=JSON.parse(localStorage.getItem('byahe-prefs')||'{}'); ttKey=localStorage.getItem('byahe-tomtom')||''; }catch(e){}
+  if(pr.rider && RLABEL[pr.rider]){ rider=pr.rider; renderRiders(); }
+  $('#s-key').value=ttKey;
+  Object.entries(PREF_CONTROLS).forEach(([sel,key])=>{   // controls first, then settings, so nothing is saved half-applied
+    const el=$(sel);
+    if(pr[key]!==undefined){ if(el.type==='checkbox') el.checked=!!pr[key]; else el.value=String(pr[key]); }
+    settings[key]=el.type==='checkbox' ? el.checked : (['radar','walk','sim'].includes(key) ? +el.value : el.value);
+  });
+  $('#keyrow').hidden=settings.source!=='live';
+  Object.keys(PREF_CONTROLS).forEach(sel=>$(sel).dispatchEvent(new Event('change')));   // each control applies itself to the map
+  savePrefs();
+}
+loadTerminals(); loadPrefs();
+
+/* ---- Motorcycle taxi: safety notice before you ride ---- */
+const MOTO_TIPS=[
+  'Wear a properly fastened helmet. The law requires one for the rider and the passenger.',
+  'Match the plate number and the driver in the app before you get on, and share your trip with someone you trust.',
+  'Rules for motorcycle taxis differ by city and can change. Confirm that the service is allowed where you are.',
+  'Steep, wet or foggy roads, like many in Baguio, make a motorcycle ride riskier. Choose a taxi or jeepney in heavy rain or fog.',
+  'Only one passenger per motorcycle. Wear closed shoes and long pants, keep your bag secure, and hold on.',
+  'The fare shown is an estimate. No student, senior or PWD discount is applied to motorcycle taxis in this app.'
+];
+['#moto-tips','#moto-list'].forEach(id=>{ const ul=$(id); MOTO_TIPS.forEach(t=>{ const li=document.createElement('li'); li.textContent=t; ul.append(li); }); });
+const motoDlg=$('#moto-dialog');
+function bookRide(){ say(`${FARES[selected.key].label} requested (demo). Driver matching comes in the next step.${selected.key==='moto'?' Check the plate number and wear the helmet.':''}`); }
+function openMotoNotice(){
+  if(typeof motoDlg.showModal!=='function'){ if(confirm(MOTO_TIPS.join('\n\n'))) bookRide(); return; }
+  $('#moto-skip').checked=false; motoDlg.showModal();
+}
+$('#moto-cancel').onclick=()=>motoDlg.close();
+$('#moto-ok').onclick=()=>{
+  if($('#moto-skip').checked){ $('#s-motonote').checked=false; settings.motonote=false; $('#moto-notice').hidden=true; savePrefs(); }   // can be turned back on in Settings
+  motoDlg.close(); bookRide();
+};
+bind('#s-motonote',el=>{ settings.motonote=el.checked; if(route) renderOptions(); });
 </script>
 </body>
 </html>
